@@ -3,10 +3,12 @@ name: Simulators
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:   # adds a "Run workflow" button on the Actions tab
 
 jobs:
-  screenshots:
+  apple:
+    name: iPhone, iPad and Apple Watch
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -22,5 +24,67 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: simulator-screenshots
+          name: apple-screenshots
+          path: screenshots/
+
+  android:
+    name: Android ${{ matrix.device }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - device: phone
+            profile: pixel_7
+          - device: tablet
+            profile: pixel_tablet
+    steps:
+      - uses: actions/checkout@v4
+
+      # Lets the Android emulator use the Linux machine's hardware
+      # acceleration (KVM), which makes it fast enough to boot.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Boot emulator and take screenshot
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          disable-animations: true
+          script: |
+            mkdir -p screenshots
+            sleep 20
+            adb shell getprop ro.build.version.release > screenshots/android-version.txt
+            adb exec-out screencap -p > "screenshots/android-${{ matrix.device }}-${{ matrix.profile }}.png"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.device }}-screenshots
+          path: screenshots/
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Take desktop screenshot
+        shell: pwsh
+        run: ./scripts/screenshot-windows.ps1 screenshots
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-screenshots
           path: screenshots/
