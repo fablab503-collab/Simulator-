@@ -1,9 +1,15 @@
 # Takes a screenshot of the whole Windows desktop and saves the Windows
 # version next to it. Works on any Windows PC and on GitHub's Windows runners.
-param([string]$OutDir = "screenshots")
+# Pass -MinimizeWindows to hide open windows first, so only the desktop shows.
+param([string]$OutDir = "screenshots", [switch]$MinimizeWindows)
 
 $ErrorActionPreference = "Stop"
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+
+if ($MinimizeWindows) {
+  (New-Object -ComObject Shell.Application).MinimizeAll()
+  Start-Sleep -Seconds 3
+}
 
 # Save which Windows version this is, so you can see it in the results.
 Get-ComputerInfo -Property OsName, OsVersion, OsBuildNumber |

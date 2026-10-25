@@ -31,7 +31,7 @@ You can also run the scripts on your own computer:
 
 ```
 ./scripts/screenshot-simulators.sh          # on a Mac with Xcode
-pwsh ./scripts/screenshot-windows.ps1       # on Windows
+pwsh ./scripts/screenshot-windows.ps1       # on Windows (add -MinimizeWindows to hide open windows)
 ```
 
 ## Notes

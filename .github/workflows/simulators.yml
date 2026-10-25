@@ -60,7 +60,12 @@ jobs:
           disable-animations: true
           script: |
             mkdir -p screenshots
-            sleep 20
+            # Give the home screen time to finish loading, then close any
+            # "isn't responding" popup left over from the busy first boot.
+            sleep 60
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            adb shell input keyevent KEYCODE_HOME
+            sleep 5
             adb shell getprop ro.build.version.release > screenshots/android-version.txt
             adb exec-out screencap -p > "screenshots/android-${{ matrix.device }}-${{ matrix.profile }}.png"
 
@@ -80,7 +85,7 @@ jobs:
 
       - name: Take desktop screenshot
         shell: pwsh
-        run: ./scripts/screenshot-windows.ps1 screenshots
+        run: ./scripts/screenshot-windows.ps1 screenshots -MinimizeWindows
 
       - name: Upload screenshots
         if: always()
