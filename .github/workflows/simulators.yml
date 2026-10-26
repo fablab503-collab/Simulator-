@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:   # adds a "Run workflow" button on the Actions tab
+  schedule:
+    - cron: "17 6 * * 1"   # every Monday at 06:17 UTC, to pick up new versions
+  workflow_dispatch:       # adds a "Run workflow" button on the Actions tab
 
 jobs:
   apple:
@@ -12,13 +14,24 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Show Xcode version
         run: xcodebuild -version
 
       - name: Boot simulators and take screenshots
         run: ./scripts/screenshot-simulators.sh screenshots
+
+      - name: List versions
+        if: always()
+        run: |
+          {
+            echo "### Apple"
+            echo '```'
+            xcodebuild -version
+            cat screenshots/installed-runtimes.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload screenshots
         if: always()
@@ -40,7 +53,7 @@ jobs:
           - device: tablet
             profile: pixel_tablet
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Lets the Android emulator use the Linux machine's hardware
       # acceleration (KVM), which makes it fast enough to boot.
@@ -50,10 +63,20 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # Ask Google's SDK which Android versions exist and use the newest one.
+      - name: Find newest Android version
+        id: api
+        run: |
+          level="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null \
+            | grep -oE 'system-images;android-[0-9]+;google_apis;x86_64' \
+            | grep -oE 'android-[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)"
+          echo "Newest Android API level: $level"
+          echo "level=$level" >> "$GITHUB_OUTPUT"
+
       - name: Boot emulator and take screenshot
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: ${{ steps.api.outputs.level }}
           target: google_apis
           arch: x86_64
           profile: ${{ matrix.profile }}
@@ -69,6 +92,11 @@ jobs:
             adb shell getprop ro.build.version.release > screenshots/android-version.txt
             adb exec-out screencap -p > "screenshots/android-${{ matrix.device }}-${{ matrix.profile }}.png"
 
+      - name: List versions
+        if: always()
+        run: |
+          echo "### Android ${{ matrix.device }}: Android $(cat screenshots/android-version.txt 2>/dev/null) (API ${{ steps.api.outputs.level }})" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -81,15 +109,64 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Take desktop screenshot
         shell: pwsh
         run: ./scripts/screenshot-windows.ps1 screenshots -MinimizeWindows
+
+      - name: List versions
+        if: always()
+        shell: pwsh
+        run: |
+          "### Windows" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          '```' | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          Get-Content screenshots/windows-version.txt | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          '```' | Out-File -Append $env:GITHUB_STEP_SUMMARY
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-screenshots
+          path: screenshots/
+
+  linux:
+    name: Linux ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        distro: [ubuntu, fedora, debian, mint, arch, opensuse, popos, omarchy]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q qemu-system-x86 ovmf python3-pil
+
+      # The ISOs are big, so keep them on the runner's larger /mnt disk.
+      - name: Boot newest ${{ matrix.distro }} and take screenshots
+        run: |
+          sudo mkdir -p /mnt/work && sudo chown "$USER" /mnt/work
+          WORK_DIR=/mnt/work ./scripts/boot-linux.sh ${{ matrix.distro }} screenshots 8
+
+      - name: List versions
+        if: always()
+        run: |
+          echo "### Linux $(cat screenshots/version.txt 2>/dev/null || echo '${{ matrix.distro }} (not found)')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.distro }}-screenshots
           path: screenshots/

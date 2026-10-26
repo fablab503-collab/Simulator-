@@ -1,0 +1,8 @@
+# Dependabot checks every week for newer versions of the GitHub Actions
+# helpers this project uses, and opens a pull request when it finds one.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
