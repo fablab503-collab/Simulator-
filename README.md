@@ -9,7 +9,7 @@ screenshot of each. Everything uses the newest version available.
 | iPhone, iPad, Apple Watch (versions 27 and 26) | GitHub's macOS machines | Xcode simulators |
 | Android phone (Pixel 7), tablet (Pixel Tablet) and folding phone (Pixel Fold, open and folded) | GitHub's Linux machine | Android emulator |
 | Mac: macOS 27, Tahoe, Sequoia (Apple M chip) and Sequoia (Intel chip) | GitHub's macOS machines | The real Mac desktop |
-| Windows | GitHub's Windows machine | The real Windows desktop |
+| Windows 11 (ARM), Server 2025, Server 2022 | GitHub's Windows machines | The real Windows desktop |
 | Ubuntu, Fedora, Debian, Mint, Arch, openSUSE, Pop!_OS, Omarchy | GitHub's Linux machine | The newest live ISO, booted in a QEMU virtual machine |
 
 ## How to use it
@@ -51,7 +51,8 @@ pwsh ./scripts/screenshot-windows.ps1       # on Windows (add -MinimizeWindows t
 - Older macOS versions (Sonoma and earlier) can't run on GitHub. Apple only allows macOS on
   Apple hardware, and GitHub no longer offers those versions.
 - iPad simulators come with the iOS runtime.
-- Windows is a real Windows machine, not a simulator.
+- Windows is a real Windows machine, not a simulator. Older Windows (XP, Vista, 7, 8)
+  isn't included: Microsoft no longer offers it for download and it gets no security fixes.
 - Linux screenshots show the live (try-before-install) desktop. Arch has no desktop
   by default, so it shows a text console. Omarchy's ISO is an installer, so it shows
   the installer's first screen.

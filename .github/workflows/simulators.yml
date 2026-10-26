@@ -153,9 +153,16 @@ jobs:
           path: screenshots/
 
   windows:
-    name: Windows
-    runs-on: windows-latest
+    name: Windows ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "11 (ARM)", runner: windows-11-arm, file: win11-arm }
+          - { name: "Server 2025", runner: windows-2025, file: server2025 }
+          - { name: "Server 2022", runner: windows-2022, file: server2022 }
     steps:
       - uses: actions/checkout@v5
 
@@ -167,7 +174,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          "### Windows" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          "### Windows ${{ matrix.name }}" | Out-File -Append $env:GITHUB_STEP_SUMMARY
           '```' | Out-File -Append $env:GITHUB_STEP_SUMMARY
           Get-Content screenshots/windows-version.txt | Out-File -Append $env:GITHUB_STEP_SUMMARY
           '```' | Out-File -Append $env:GITHUB_STEP_SUMMARY
@@ -176,7 +183,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: windows-screenshots
+          name: windows-${{ matrix.file }}-screenshots
           path: screenshots/
 
   linux:
