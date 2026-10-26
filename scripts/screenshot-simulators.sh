@@ -21,7 +21,7 @@ if [[ -n "$IOS_MAJOR" ]]; then
   if (( IOS_MAJOR >= 26 )); then WATCH_MAJOR="$IOS_MAJOR"; else WATCH_MAJOR=$(( IOS_MAJOR - 7 )); fi
 fi
 
-# Prints "<udid><TAB><name>" for the first device whose name starts with
+# Prints "<udid><TAB><name><TAB><runtime>" for the first device whose name starts with
 # PREFIX, using the newest installed runtime for OS (iOS, watchOS, ...),
 # or the newest one of version MAJOR when that is given.
 pick_device() {
@@ -31,23 +31,27 @@ pick_device() {
       | map(select(.key | test("SimRuntime\\." + $os + "-" + (if $major == "" then "" else $major + "-" end))))
       | sort_by(.key | split("-")[1:] | map(tonumber))
       | reverse[]
+      | .key as $runtime
       | .value[]
-      | select(.name | startswith($prefix)) ]
+      | select(.name | startswith($prefix))
+      | . + {runtime: $runtime} ]
     | (first // empty)
-    | "\(.udid)\t\(.name)"
+    | "\(.udid)\t\(.name)\t\(.runtime)"
   ' <<< "$DEVICES_JSON"
 }
 
 shoot() {
   local label="$1" os="$2" prefix="$3" major="${4:-}"
-  local line udid name
+  local line udid name runtime version
   line="$(pick_device "$os" "$prefix" "$major")"
   if [[ -z "$line" ]]; then
     echo "::warning::No $label simulator installed ($os runtime missing), skipping."
     return 0
   fi
-  udid="${line%%$'\t'*}"
-  name="${line#*$'\t'}"
+  IFS=$'\t' read -r udid name runtime <<< "$line"
+  # "com.apple.CoreSimulator.SimRuntime.iOS-26-5" -> "iOS 26.5"
+  version="$(sed -E 's/.*SimRuntime\.//; s/^xrOS/visionOS/; s/-/ /; s/-/./g' <<< "$runtime")"
+  echo "$label - $name: $version" >> "$OUT_DIR/devices.txt"
 
   echo "==> $label: $name ($udid)"
   xcrun simctl boot "$udid" || true          # ignore "already booted"

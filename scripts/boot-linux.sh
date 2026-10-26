@@ -27,6 +27,7 @@ if [[ "$MEDIA" == *.zip ]]; then
   unzip -o -q "$MEDIA" -d "$WORK/unzipped"
   MEDIA="$(find "$WORK/unzipped" -type f \( -iname '*live*.iso' -o -iname '*.iso' -o -iname '*.bin' \) | sort | awk 'tolower($0) ~ /live/ {print; found=1; exit} {first = first ? first : $0} END {if (!found) print first}')"
   echo "Using $(basename "$MEDIA") from the zip"
+  echo "$DISTRO: $(basename "$MEDIA")" > "$OUT_DIR/version.txt"
 fi
 
 MON="$WORK/monitor.sock"
@@ -54,12 +55,14 @@ case "$DISTRO" in
              -nic user,model=e1000)
     ;;
   chromeos)
-    # ChromeOS Flex expects to start from a USB stick, with a plain screen.
+    # ChromeOS Flex expects to start from a USB stick; with virtio graphics
+    # it reaches its logo (the plain VGA screen stayed on the firmware).
     cp /usr/share/OVMF/OVMF_VARS_4M.fd "$WORK/vars.fd"
     MACHINE=(-machine q35,accel=kvm:tcg -cpu max -smp 4 -m 6144
              -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd
              -drive if=pflash,format=raw,file="$WORK/vars.fd"
-             -device VGA -netdev user,id=n0 -device virtio-net-pci,netdev=n0)
+             -device virtio-vga -netdev user,id=n0 -device virtio-net-pci,netdev=n0)
+    MINUTES="${3:-12}"
     ;;
   *)
     cp /usr/share/OVMF/OVMF_VARS_4M.fd "$WORK/vars.fd"

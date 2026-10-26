@@ -29,9 +29,13 @@ case "${1:?distro name required}" in
     v="$(newest_dir "$base/")"
     echo "$base/$v/linuxmint-$v-cinnamon-64bit.iso" ;;
   arch)
-    echo "https://geo.mirror.pkgbuild.com/iso/latest/archlinux-x86_64.iso" ;;
+    # The dated file name (archlinux-2026.10.01-x86_64.iso) shows which release it is.
+    base=https://geo.mirror.pkgbuild.com/iso/latest
+    echo "$base/$(get "$base/" | grep -oE 'archlinux-[0-9.]+-x86_64\.iso' | sort -uV | tail -1)" ;;
   opensuse)
-    echo "https://download.opensuse.org/tumbleweed/iso/openSUSE-Tumbleweed-KDE-Live-x86_64-Current.iso" ;;
+    # Tumbleweed is a rolling release: the snapshot date is its version.
+    base=https://download.opensuse.org/tumbleweed/iso
+    echo "$base/$(get "$base/" | grep -oE 'openSUSE-Tumbleweed-KDE-Live-x86_64-Snapshot[0-9]+-Media\.iso' | sort -uV | tail -1)" ;;
   popos)
     # Try newer Pop!_OS versions first; the API answers 404 for ones that don't exist yet.
     for v in 28.04 26.10 26.04 24.10 24.04; do
