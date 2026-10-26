@@ -72,16 +72,27 @@ CFG
   exit 0
 fi
 
+# Downloads the newest release file from a GitHub project whose name matches
+# REGEX (case-insensitive). The list of files is printed, so a mismatch is
+# easy to fix. Usage: fetch_release <owner/repo> <regex>
+fetch_release() {
+  local repo="$1" regex="$2" names name
+  names="$(gh release view -R "$repo" --json assets --jq '.assets[].name' 2>/dev/null || true)"
+  { echo "Files in the newest $repo release:"; echo "$names" | sed 's/^/  /'; } >&2
+  name="$(echo "$names" | grep -iE "$regex" | head -1 || true)"
+  [[ -n "$name" ]] || return 1
+  gh release download -R "$repo" --pattern "$name" -D "$WORK" --clobber >&2
+  echo "$WORK/$name"
+}
+
 # Standalone PlayStation emulators, downloaded from their official releases.
 case "$CONSOLE" in
   ps2)
-    gh release download -R PCSX2/pcsx2 --pattern '*linux-appimage-x64-Qt.AppImage' -D "$WORK" --clobber
-    app="$(ls "$WORK"/*.AppImage | head -1)"
+    app="$(fetch_release PCSX2/pcsx2 'linux.*x64.*\.AppImage$' | tail -1)"
     echo "ps2: PCSX2 $(basename "$app") (needs a BIOS from your own PS2 to play)" | tee "$OUT_DIR/version.txt"
     ;;
   ps3)
-    gh release download -R RPCS3/rpcs3-binaries-linux --pattern '*.AppImage' -D "$WORK" --clobber
-    app="$(ls "$WORK"/*.AppImage | head -1)"
+    app="$(fetch_release RPCS3/rpcs3-binaries-linux '(x86_64|linux).*\.AppImage$|\.AppImage$' | tail -1)"
     # Sony gives out the PS3 system software for free on its own website.
     fw="$(curl -fsSL https://www.playstation.com/en-us/support/hardware/ps3/system-software/ | grep -oE 'https?://[^"]*PS3UPDAT\.PUP' | head -1)"
     echo "ps3: RPCS3 $(basename "$app") + Sony PS3 system software ($fw)" | tee "$OUT_DIR/version.txt"
@@ -90,9 +101,12 @@ case "$CONSOLE" in
     timeout 600 "$app" --installfw "$WORK/PS3UPDAT.PUP" >"$OUT_DIR/firmware-install.log" 2>&1 || echo "Firmware install ended with $?"
     ;;
   ps4)
-    gh release download -R shadps4-emu/shadPS4 --pattern '*linux-qt*' -D "$WORK" --clobber
-    for z in "$WORK"/*.zip; do [[ -f "$z" ]] && unzip -o -q "$z" -d "$WORK"; done
-    app="$(find "$WORK" -name '*.AppImage' | head -1)"
+    # shadPS4's window (the "Qt launcher") lives in its own project now; fall
+    # back to the main project's Linux build.
+    file="$(fetch_release shadps4-emu/shadps4-qtlauncher 'linux' | tail -1)" \
+      || file="$(fetch_release shadps4-emu/shadPS4 'linux.*qt|linux' | tail -1)"
+    [[ "$file" == *.zip ]] && unzip -o -q "$file" -d "$WORK/ps4"
+    app="$(find "$WORK" -iname '*.AppImage' | head -1)"
     echo "ps4: shadPS4 $(basename "$app") (needs files from your own PS4 to play)" | tee "$OUT_DIR/version.txt"
     ;;
 esac
