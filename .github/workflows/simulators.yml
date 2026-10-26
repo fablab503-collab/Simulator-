@@ -3,14 +3,44 @@ name: Simulators
 on:
   push:
     branches: [main]
-  workflow_dispatch:   # adds a "Run workflow" button on the Actions tab
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"   # every Monday at 06:17 UTC, to pick up new versions
+  workflow_dispatch:       # adds a "Run workflow" button on the Actions tab
 
 jobs:
-  screenshots:
-    runs-on: macos-latest
+  apple:
+    name: iPhone, iPad and Apple Watch (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # xcode-27 is GitHub's macOS 27 machine with Xcode 27 and the iOS 27 simulators.
+          - { name: "27", runner: xcode-27 }
+          - { name: "26", runner: macos-26 }
+          # Older versions: GitHub's macOS 15 machine has iOS 18, and Xcode can
+          # download iOS 17 when it's missing.
+          - { name: "18", runner: macos-15, ios: "18" }
+          - { name: "17", runner: macos-15, ios: "17" }
+    env:
+      IOS_MAJOR: ${{ matrix.ios }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Download older iOS if missing
+        if: matrix.ios != ''
+        run: |
+          if xcrun simctl list runtimes | grep -q "^iOS $IOS_MAJOR\."; then
+            echo "iOS $IOS_MAJOR is already installed"
+          else
+            for v in "$IOS_MAJOR.5" "$IOS_MAJOR.4" "$IOS_MAJOR.0"; do
+              echo "Trying to download iOS $v"
+              xcodebuild -downloadPlatform iOS -buildVersion "$v" && break || true
+            done
+          fi
+          xcrun simctl list runtimes
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -18,9 +48,382 @@ jobs:
       - name: Boot simulators and take screenshots
         run: ./scripts/screenshot-simulators.sh screenshots
 
+      - name: List versions
+        if: always()
+        run: |
+          {
+            echo "### Apple ${{ matrix.name }}"
+            echo '```'
+            xcodebuild -version
+            cat screenshots/installed-runtimes.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: simulator-screenshots
+          name: apple-${{ matrix.name }}-screenshots
           path: screenshots/
+
+  mac:
+    name: Mac ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple M-series chips. (macOS 14 Sonoma was removed: GitHub retires it on Nov 2, 2026.)
+          - { name: "27 (M)", runner: xcode-27, file: macos27-m }
+          - { name: "Tahoe (M)", runner: macos-26, file: tahoe-m }
+          - { name: "Sequoia (M)", runner: macos-15, file: sequoia-m }
+          # Intel chip, like Macs from before 2020
+          - { name: "Sequoia (Intel)", runner: macos-15-intel, file: sequoia-intel }
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Take desktop screenshot
+        run: ./scripts/screenshot-mac.sh screenshots mac-${{ matrix.file }}
+
+      - name: List versions
+        if: always()
+        run: |
+          {
+            echo "### Mac ${{ matrix.name }}"
+            echo '```'
+            cat screenshots/mac-${{ matrix.file }}-version.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.file }}-screenshots
+          path: screenshots/
+
+  android:
+    name: Android ${{ matrix.device }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - device: phone
+            profile: pixel_7
+          - device: tablet
+            profile: pixel_tablet
+          - device: foldable
+            profile: auto-fold   # picked below from the folding phones the SDK knows
+    steps:
+      - uses: actions/checkout@v5
+
+      # Lets the Android emulator use the Linux machine's hardware
+      # acceleration (KVM), which makes it fast enough to boot.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Ask Google's SDK which Android versions exist and use the newest one.
+      - name: Find newest Android version
+        id: api
+        run: |
+          level="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null \
+            | grep -oE 'system-images;android-[0-9]+;google_apis;x86_64' \
+            | grep -oE 'android-[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)"
+          echo "Newest Android API level: $level"
+          echo "level=$level" >> "$GITHUB_OUTPUT"
+
+      # The SDK's names for folding phones change over time, so ask it which
+      # ones it has and prefer a Pixel.
+      - name: Find device profile
+        id: profile
+        run: |
+          profile="${{ matrix.profile }}"
+          if [ "$profile" = "auto-fold" ]; then
+            ids="$("$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" list device -c 2>/dev/null)"
+            echo "Folding devices: $(echo "$ids" | grep -i fold | tr '\n' ' ')"
+            profile="$(echo "$ids" | grep -i 'pixel.*fold' | tail -1)"
+            [ -n "$profile" ] || profile="$(echo "$ids" | grep -i fold | head -1)"
+          fi
+          echo "Using device profile: $profile"
+          echo "name=$profile" >> "$GITHUB_OUTPUT"
+
+      - name: Boot emulator and take screenshot
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ steps.api.outputs.level }}
+          target: google_apis
+          arch: x86_64
+          profile: ${{ steps.profile.outputs.name }}
+          disable-animations: true
+          script: |
+            mkdir -p screenshots
+            # Give the home screen time to finish loading, then close any
+            # "isn't responding" popup left over from the busy first boot.
+            sleep 60
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            adb shell input keyevent KEYCODE_HOME
+            sleep 5
+            adb shell getprop ro.build.version.release > screenshots/android-version.txt
+            adb exec-out screencap -p > "screenshots/android-${{ matrix.device }}.png"
+            # Folding phones: close it and take a second photo of the outside screen.
+            if [ "${{ matrix.device }}" = "foldable" ]; then adb emu fold && sleep 15 && adb exec-out screencap -p > "screenshots/android-foldable-folded.png" || echo "Could not fold"; fi
+
+      - name: List versions
+        if: always()
+        run: |
+          echo "### Android ${{ matrix.device }}: Android $(cat screenshots/android-version.txt 2>/dev/null) (API ${{ steps.api.outputs.level }})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.device }}-screenshots
+          path: screenshots/
+
+  # Every older Android, one per version, from Android 5 (2014) to 15.
+  android-history:
+    name: Android API ${{ matrix.api }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [21, 23, 24, 26, 28, 29, 30, 31, 33, 34, 35]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Boot emulator and take screenshot
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel
+          disable-animations: true
+          script: |
+            mkdir -p screenshots
+            sleep 60
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            adb shell input keyevent KEYCODE_HOME
+            sleep 5
+            adb shell getprop ro.build.version.release > screenshots/android-version.txt
+            adb exec-out screencap -p > "screenshots/android-api-${{ matrix.api }}.png"
+
+      - name: List versions
+        if: always()
+        run: |
+          echo "### Android API ${{ matrix.api }}: Android $(cat screenshots/android-version.txt 2>/dev/null)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-api-${{ matrix.api }}-screenshots
+          path: screenshots/
+
+  windows:
+    name: Windows ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "11 (ARM)", runner: windows-11-arm, file: win11-arm }
+          - { name: "Server 2025", runner: windows-2025, file: server2025 }
+          - { name: "Server 2022", runner: windows-2022, file: server2022 }
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Take desktop screenshot
+        shell: pwsh
+        run: ./scripts/screenshot-windows.ps1 screenshots -MinimizeWindows
+
+      - name: List versions
+        if: always()
+        shell: pwsh
+        run: |
+          "### Windows ${{ matrix.name }}" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          '```' | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          Get-Content screenshots/windows-version.txt | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          '```' | Out-File -Append $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.file }}-screenshots
+          path: screenshots/
+
+  linux:
+    name: Boot ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          # Newest Linux
+          - ubuntu
+          - fedora
+          - debian
+          - mint
+          - arch
+          - opensuse
+          - popos
+          - omarchy
+          # Older Ubuntu, back to the very first one (2004)
+          - ubuntu-24.04
+          - ubuntu-22.04
+          - ubuntu-20.04
+          - ubuntu-18.04
+          - ubuntu-16.04
+          - ubuntu-14.04
+          - ubuntu-12.04
+          - ubuntu-10.04
+          - ubuntu-8.04
+          - ubuntu-6.06
+          - ubuntu-4.10
+          # Other free systems
+          - reactos
+          - freedos
+          - haiku
+          - freebsd
+          - chromeos
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 ipxe-qemu ovmf python3-pil unzip
+
+      # The ISOs are big, so keep them on the runner's larger /mnt disk.
+      - name: Boot newest ${{ matrix.distro }} and take screenshots
+        run: |
+          sudo mkdir -p /mnt/work && sudo chown "$USER" /mnt/work
+          WORK_DIR=/mnt/work ./scripts/boot-linux.sh ${{ matrix.distro }} screenshots
+
+      - name: List versions
+        id: info
+        if: always()
+        run: |
+          case "${{ matrix.distro }}" in
+            reactos|freedos|haiku|freebsd|chromeos) group=other ;;
+            *) group=linux ;;
+          esac
+          echo "group=$group" >> "$GITHUB_OUTPUT"
+          echo "### $(cat screenshots/version.txt 2>/dev/null || echo '${{ matrix.distro }} (not found)')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.info.outputs.group }}-${{ matrix.distro }}-screenshots
+          path: screenshots/
+
+  # Game console emulators, with free homebrew games only.
+  games:
+    name: Game ${{ matrix.console }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50   # PS3 installs Sony's system software, which takes a while
+    strategy:
+      fail-fast: false
+      matrix:
+        console: [nes, snes, gb, gba, genesis, ps1, psp, gamecube, ps2, ps3, ps4]
+    steps:
+      - uses: actions/checkout@v5
+
+      # Install only what this console needs (no ImageMagick: it pulls in big
+      # font packages that stalled on a slow mirror). A stalled download gives
+      # up after 30 seconds and retries; each try gets 10 minutes, up to 3 tries.
+      - name: Install emulator tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          case "${{ matrix.console }}" in
+            ps2|ps3|ps4) extra=flatpak ;;
+            *)           extra=retroarch ;;
+          esac
+          opts="-o Acquire::Retries=3 -o Acquire::http::Timeout=30"
+          for try in 1 2 3; do
+            sudo -E timeout 600 apt-get $opts update -q &&
+            sudo -E timeout 600 apt-get $opts install -y -q --no-install-recommends \
+              xvfb xdotool unzip python3-pil mesa-vulkan-drivers libgl1-mesa-dri $extra && break
+            echo "Install try $try failed, trying again"; sleep 15
+          done
+
+      - name: Run ${{ matrix.console }} emulator
+        run: ./scripts/run-emulator.sh ${{ matrix.console }} screenshots
+
+      - name: List versions
+        if: always()
+        run: |
+          echo "### Game $(cat screenshots/version.txt 2>/dev/null || echo '${{ matrix.console }} (not found)')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: games-${{ matrix.console }}-screenshots
+          path: screenshots/
+
+  # Gimmich: collect every system's photos into one download.
+  gimmich:
+    name: Gimmich (everything in one download)
+    needs: [apple, mac, android, android-history, windows, linux, games]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # to publish the weekly "gimmich-latest" release
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download every system's photos
+        uses: actions/download-artifact@v4
+        with:
+          path: all
+
+      - name: Build the Gimmich bundle
+        run: |
+          pip install --quiet pillow
+          python3 scripts/make-gimmich.py all gimmich
+          cat gimmich/versions.md >> "$GITHUB_STEP_SUMMARY"
+          (cd gimmich && zip -qr ../gimmich.zip .)
+
+      - name: Upload the Gimmich bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: gimmich
+          path: gimmich/
+
+      # On main and the weekly run, replace the "gimmich-latest" release so
+      # the same link always downloads the newest bundle.
+      - name: Publish as the latest Gimmich release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete gimmich-latest --yes --cleanup-tag || true
+          gh release create gimmich-latest gimmich.zip gimmich/gimmich-all.png \
+            --title "Gimmich: every system, $(date -u +%Y-%m-%d)" \
+            --notes-file gimmich/versions.md --latest
