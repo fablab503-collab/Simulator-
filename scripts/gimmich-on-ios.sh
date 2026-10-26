@@ -46,10 +46,18 @@ try_app() {
     # watchOS has no Safari: nothing of Gimmich can open here, so just show that the watch runs
     xcrun simctl io "$udid" screenshot "$OUT_DIR/$label - $name - home (no web browser on watchOS).png"
   else
+    # a freshly started simulator is slow to open Safari the first time: start it, then give it time
+    xcrun simctl launch "$udid" com.apple.mobilesafari >/dev/null 2>&1 || true
+    sleep 20
     for page in "studio/:1 Studio" "studio/connect/:2 Connect a device" "studio/camera/:3 Camera"; do
-      local path="${page%%:*}" title="${page#*:}"
-      xcrun simctl openurl "$udid" "$BASE/$path"
-      sleep 12                                  # Safari opens and the page loads
+      local path="${page%%:*}" title="${page#*:}" ok=""
+      for attempt in 1 2 3; do
+        if xcrun simctl openurl "$udid" "$BASE/$path"; then ok=1; break; fi
+        echo "    Safari didn't open the page yet (try $attempt), waiting..."
+        sleep 20
+      done
+      [[ -n "$ok" ]] || echo "::warning::$label could not open $path"
+      sleep 12                                  # the page loads
       xcrun simctl io "$udid" screenshot "$OUT_DIR/$label - $name - $title.png"
     done
   fi

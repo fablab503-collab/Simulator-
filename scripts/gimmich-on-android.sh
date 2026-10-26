@@ -50,7 +50,9 @@ echo "--- tap 'Open in Gimmich Camera' (the gimmich:// link from Connect a devic
 adb shell am start -W -a android.intent.action.VIEW -d "gimmich://connect?server=$SERVER" >/dev/null
 sleep 5; shot "2 asks before connecting"
 tap "Connect" || echo "    (no 'Connect' question shown)"
-sleep 25; shot "3 camera"
+sleep 20
+tap "Got it" && sleep 3          # Android's one-time "Viewing full screen" tip
+shot "3 camera"
 
 echo "--- press the shutter"
 before="$(uploads)"
