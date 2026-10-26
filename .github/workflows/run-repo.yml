@@ -290,6 +290,7 @@ jobs:
           path: results
       - name: Make the report
         run: |
+          python3 -m pip install -q pillow 2>/dev/null || true
           python3 scripts/run-file-report.py results report
           cat report/report.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
