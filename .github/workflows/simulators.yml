@@ -240,3 +240,45 @@ jobs:
         with:
           name: linux-${{ matrix.distro }}-screenshots
           path: screenshots/
+
+  # Gimmich: collect every system's photos into one download.
+  gimmich:
+    name: Gimmich (everything in one download)
+    needs: [apple, mac, android, windows, linux]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write   # to publish the weekly "gimmich-latest" release
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download every system's photos
+        uses: actions/download-artifact@v4
+        with:
+          path: all
+
+      - name: Build the Gimmich bundle
+        run: |
+          pip install --quiet pillow
+          python3 scripts/make-gimmich.py all gimmich
+          cat gimmich/versions.md >> "$GITHUB_STEP_SUMMARY"
+          (cd gimmich && zip -qr ../gimmich.zip .)
+
+      - name: Upload the Gimmich bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: gimmich
+          path: gimmich/
+
+      # On main and the weekly run, replace the "gimmich-latest" release so
+      # the same link always downloads the newest bundle.
+      - name: Publish as the latest Gimmich release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete gimmich-latest --yes --cleanup-tag || true
+          gh release create gimmich-latest gimmich.zip gimmich/gimmich-all.png \
+            --title "Gimmich: every system, $(date -u +%Y-%m-%d)" \
+            --notes-file gimmich/versions.md --latest

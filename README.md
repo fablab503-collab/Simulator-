@@ -12,6 +12,15 @@ screenshot of each. Everything uses the newest version available.
 | Windows 11 (ARM), Server 2025, Server 2022 | GitHub's Windows machines | The real Windows desktop |
 | Ubuntu, Fedora, Debian, Mint, Arch, openSUSE, Pop!_OS, Omarchy | GitHub's Linux machine | The newest live ISO, booted in a QEMU virtual machine |
 
+## Gimmich: everything in one download
+
+After each run, the **Gimmich** step puts every system's photos, one picture of all of
+them together (`gimmich-all.png`), and a list of every version (`versions.md`) into a
+single download:
+
+- **Newest weekly bundle:** https://github.com/fablab503-collab/Simulator-/releases/download/gimmich-latest/gimmich.zip
+- **Any single run:** open the run on the Actions tab and download `gimmich`.
+
 ## How to use it
 
 1. Open the **Actions** tab of this repository.
