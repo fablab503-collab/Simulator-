@@ -57,7 +57,7 @@ try_app() {
         sleep 20
       done
       [[ -n "$ok" ]] || echo "::warning::$label could not open $path"
-      sleep 12                                  # the page loads
+      sleep 20                                  # the page loads (and the camera starts)
       xcrun simctl io "$udid" screenshot "$OUT_DIR/$label - $name - $title.png"
     done
   fi
