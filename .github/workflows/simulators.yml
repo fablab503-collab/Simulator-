@@ -96,6 +96,8 @@ jobs:
             profile: pixel_7
           - device: tablet
             profile: pixel_tablet
+          - device: foldable
+            profile: pixel_fold
     steps:
       - uses: actions/checkout@v5
 
@@ -135,6 +137,8 @@ jobs:
             sleep 5
             adb shell getprop ro.build.version.release > screenshots/android-version.txt
             adb exec-out screencap -p > "screenshots/android-${{ matrix.device }}-${{ matrix.profile }}.png"
+            # Folding phones: close it and take a second photo of the outside screen.
+            if [ "${{ matrix.device }}" = "foldable" ]; then adb emu fold && sleep 15 && adb exec-out screencap -p > "screenshots/android-foldable-folded.png" || echo "Could not fold"; fi
 
       - name: List versions
         if: always()

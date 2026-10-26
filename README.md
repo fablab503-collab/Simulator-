@@ -1,13 +1,13 @@
 # Simulator
 
-Runs **iPhone, iPad, Apple Watch, Android (phone and tablet), Windows and
+Runs **iPhone, iPad, Apple Watch, Android (phone, tablet and folding phone), Windows and
 8 Linux versions** on free machines borrowed from GitHub Actions, and takes a
 screenshot of each. Everything uses the newest version available.
 
 | Device | Runs on | Tool |
 | --- | --- | --- |
 | iPhone, iPad, Apple Watch (versions 27 and 26) | GitHub's macOS machines | Xcode simulators |
-| Android phone (Pixel 7) and tablet (Pixel Tablet) | GitHub's Linux machine | Android emulator |
+| Android phone (Pixel 7), tablet (Pixel Tablet) and folding phone (Pixel Fold, open and folded) | GitHub's Linux machine | Android emulator |
 | Mac: macOS 27, Tahoe, Sequoia (Apple M chip) and Sequoia (Intel chip) | GitHub's macOS machines | The real Mac desktop |
 | Windows | GitHub's Windows machine | The real Windows desktop |
 | Ubuntu, Fedora, Debian, Mint, Arch, openSUSE, Pop!_OS, Omarchy | GitHub's Linux machine | The newest live ISO, booted in a QEMU virtual machine |
