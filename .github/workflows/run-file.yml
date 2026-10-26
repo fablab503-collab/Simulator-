@@ -172,7 +172,10 @@ jobs:
             $p = Start-Process msiexec -ArgumentList "/i `"$file`" /qn /norestart /l*v result\install.log" -Wait -PassThru
             "Installed, exit code $($p.ExitCode)" | Out-File -Append result/result.txt
           } else {
-            # Opens the program (or its installer window) and waits for it to show.
+            # Hides GitHub's own log window first, then opens the program (or
+            # its installer window) and waits for it to show.
+            (New-Object -ComObject Shell.Application).MinimizeAll()
+            Start-Sleep -Seconds 3
             Start-Process $file
             Start-Sleep -Seconds 30
             "Started the program; picture taken after 30 s" | Out-File -Append result/result.txt
