@@ -51,7 +51,13 @@ shoot() {
 
   echo "==> $label: $name ($udid)"
   xcrun simctl boot "$udid" || true          # ignore "already booted"
-  xcrun simctl bootstatus "$udid" -b
+  # Some GitHub Macs list a simulator whose files are missing ("cannot
+  # determine the runtime bundle"); skip it instead of failing everything.
+  if ! xcrun simctl bootstatus "$udid" -b; then
+    echo "::warning::$label ($name) could not start on this machine, skipping."
+    xcrun simctl shutdown "$udid" 2>/dev/null || true
+    return 0
+  fi
   sleep 10                                    # let the home screen settle
   # Devices with more than one screen (like a folding iPhone) need each
   # screen named; simctl lists them when the plain screenshot fails.
