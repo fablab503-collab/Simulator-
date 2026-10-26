@@ -48,8 +48,9 @@ shots=$(( MINUTES * 2 ))
 for i in $(seq 1 "$shots"); do
   sleep 30
   n=$(printf '%02d' "$i")
-  # Nudge the mouse so the screen doesn't go to sleep or lock.
-  mon "mouse_move 5 5" "mouse_move -5 -5" "screendump $WORK/$DISTRO-$n.ppm"
+  # Nudge the mouse and tap Shift so the screen doesn't go to sleep or lock
+  # (KDE ignores mouse nudges, but counts a key press as activity).
+  mon "mouse_move 5 5" "mouse_move -5 -5" "sendkey shift" "screendump $WORK/$DISTRO-$n.ppm"
 done
 sleep 1
 
