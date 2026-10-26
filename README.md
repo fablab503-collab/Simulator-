@@ -25,6 +25,29 @@ single download:
 - **Newest weekly bundle:** https://github.com/fablab503-collab/Simulator-/releases/download/gimmich-latest/gimmich.zip
 - **Any single run:** open the run on the Actions tab and download `gimmich`.
 
+## Gimmich control: run any file
+
+Give Gimmich one file and only the system that can open it starts:
+
+| File | Opens on |
+|---|---|
+| Android app (`.apk`) | Android emulator: installs and opens it |
+| Windows program (`.exe`, `.msi`) | Windows Server 2025 |
+| Mac app (`.dmg`, `.pkg`, zipped `.app`) | macOS 26 |
+| Bootable disc (`.iso`) | QEMU virtual PC on Linux |
+| Retro game (`.nes`, `.sfc`, `.gb`, `.gba`, `.md`) | RetroArch |
+| Web page, e-book (`.html`, `.epub`) | Chrome |
+| PDF, video, audio, picture | Linux: first page / 9 frames / sound wave / the picture |
+| Code (`.py` `.rs` `.java` `.c` `.cpp` `.go` `.js` `.sh`) | Linux: compiles and runs it |
+| Linux app (AppImage, program, `.deb`, `.rpm`) | Linux: starts it or lists what's inside |
+
+It checks what's *inside* the file first, so a wrong name doesn't fool it
+(`scripts/route-file.py`).
+
+**How:** Actions → **Run a file** → Run workflow → paste a download link. Or put
+the file in `inbox/` and push. Download `gimmich-run-report` from the run: one
+picture and one note per file.
+
 ## How to use it
 
 1. Open the **Actions** tab of this repository.

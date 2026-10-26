@@ -1,0 +1,327 @@
+name: Run a file
+
+# Gimmich control: give it a file and only the system that can open it starts.
+# Two ways to give it a file:
+#   1. Actions tab -> "Run a file" -> Run workflow, and paste a download link.
+#   2. Put the file in the inbox/ folder and push (files under 100 MB).
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Download link of the file (empty = every file in inbox/)"
+        required: false
+      name:
+        description: "File name to save it as (optional, e.g. game.nes)"
+        required: false
+  push:
+    branches: [main]
+    paths: ["inbox/**", "!inbox/README.md"]
+  # Changes to Gimmich control test themselves on free sample files.
+  pull_request:
+    paths:
+      - .github/workflows/run-file.yml
+      - scripts/route-file.py
+      - scripts/run-file-*
+
+jobs:
+  route:
+    name: Find the right system
+    runs-on: ubuntu-latest
+    outputs:
+      android: ${{ steps.route.outputs.android }}
+      windows: ${{ steps.route.outputs.windows }}
+      mac: ${{ steps.route.outputs.mac }}
+      linux: ${{ steps.route.outputs.linux }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      - name: Get the file
+        env:
+          URL: ${{ inputs.url }}
+          NAME: ${{ inputs.name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir input
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            # Free samples, one or more for each system.
+            curl -fL --retry 5 -o input/F-Droid.apk https://f-droid.org/F-Droid.apk
+            curl -fL --retry 5 -o input/putty.exe https://the.earth.li/~sgtatham/putty/latest/w64/putty.exe
+            gh release download -R rxhanson/Rectangle --pattern '*.dmg' -D input
+            curl -fL --retry 5 -o "input/Alter Ego.nes" "https://buildbot.libretro.com/assets/cores/Nintendo%20-%20Nintendo%20Entertainment%20System/Alter%20Ego.nes"
+            printf '<!doctype html><title>Hi</title><body style="font:48px sans-serif;background:#e8f0ff"><h1>Hello from Gimmich</h1>' > input/hello.html
+            printf 'fn main() {\n    for i in 1..=5 { println!("Gimmich says hi #{i}"); }\n}\n' > input/hello.rs
+          elif [ -n "$URL" ]; then
+            [ -n "$NAME" ] || NAME="$(python3 -c 'import os, sys, urllib.parse as u; print(os.path.basename(u.unquote(u.urlparse(sys.argv[1]).path)) or "file")' "$URL")"
+            curl -fL --retry 5 --retry-all-errors -o "input/$(basename "$NAME")" "$URL"
+          elif [ "${{ github.event_name }}" = push ]; then
+            # Only the files this push added or changed.
+            git diff --name-only --diff-filter=AM HEAD~1 HEAD -- inbox | grep -v '^inbox/README.md$' |
+              while IFS= read -r f; do cp "$f" input/; done
+          else
+            find inbox -type f ! -name README.md -exec cp {} input/ \;
+          fi
+          ls -la input
+          [ -n "$(ls input)" ] || { echo "::error::No file given: paste a link, or put a file in inbox/"; exit 1; }
+
+      - name: Work out what each file is
+        id: route
+        run: |
+          python3 -I scripts/route-file.py input/* | tee route.jsonl
+          echo "### Files" >> "$GITHUB_STEP_SUMMARY"
+          python3 -c 'import json, sys
+          for l in open("route.jsonl"):
+              r = json.loads(l); print("- **%s**: %s → **%s**" % (r["file"], r["detail"], r["system"]))' >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: input
+          path: input/
+
+  android:
+    name: Android · ${{ matrix.item.file }}
+    needs: route
+    if: needs.route.outputs.android != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        item: ${{ fromJSON(needs.route.outputs.android) }}
+    env:
+      FILE: input/${{ matrix.item.file }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: input
+          path: input
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Find newest Android version
+        id: api
+        run: |
+          level="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null \
+            | grep -oE 'system-images;android-[0-9]+;google_apis;x86_64' \
+            | grep -oE 'android-[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)"
+          echo "level=$level" >> "$GITHUB_OUTPUT"
+          mkdir -p result
+          printf 'File: %s\nKind: %s\n' "${{ matrix.item.file }}" "${{ matrix.item.detail }}" > result/result.txt
+
+      # Each line of this script runs on its own, so no multi-line commands.
+      - name: Install the app and open it
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ steps.api.outputs.level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          script: |
+            sleep 60
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            adb shell pm list packages -3 | tr -d '\r' | sort > before.txt
+            adb install -r -g "$FILE" 2>&1 | tee result/install.txt
+            adb shell pm list packages -3 | tr -d '\r' | sort > after.txt
+            comm -13 before.txt after.txt | head -1 | cut -d: -f2 > package.txt
+            echo "Android $(adb shell getprop ro.build.version.release | tr -d '\r'), app $(cat package.txt)" >> result/result.txt
+            adb shell monkey -p "$(cat package.txt)" -c android.intent.category.LAUNCHER 1 || echo "Could not open the app" >> result/result.txt
+            sleep 20
+            adb exec-out screencap -p > result/result.png
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-android-${{ strategy.job-index }}
+          path: result/
+
+  windows:
+    name: Windows · ${{ matrix.item.file }}
+    needs: route
+    if: needs.route.outputs.windows != '[]'
+    runs-on: windows-2025
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        item: ${{ fromJSON(needs.route.outputs.windows) }}
+    env:
+      FILE: input/${{ matrix.item.file }}
+      KIND: ${{ matrix.item.kind }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: input
+          path: input
+
+      - name: Start the program
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force result | Out-Null
+          "File: ${{ matrix.item.file }}", "Kind: ${{ matrix.item.detail }}" | Out-File result/result.txt
+          $file = Resolve-Path $env:FILE
+          if ($env:KIND -eq "windows-installer") {
+            # Installs quietly, then shows the desktop.
+            $p = Start-Process msiexec -ArgumentList "/i `"$file`" /qn /norestart /l*v result\install.log" -Wait -PassThru
+            "Installed, exit code $($p.ExitCode)" | Out-File -Append result/result.txt
+          } else {
+            # Opens the program (or its installer window) and waits for it to show.
+            Start-Process $file
+            Start-Sleep -Seconds 30
+            "Started the program; picture taken after 30 s" | Out-File -Append result/result.txt
+          }
+          ./scripts/screenshot-windows.ps1 result
+          Move-Item result/windows-desktop.png result/result.png
+          (Get-ComputerInfo).OsName | Out-File -Append result/result.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-windows-${{ strategy.job-index }}
+          path: result/
+
+  mac:
+    name: Mac · ${{ matrix.item.file }}
+    needs: route
+    if: needs.route.outputs.mac != '[]'
+    runs-on: macos-26
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        item: ${{ fromJSON(needs.route.outputs.mac) }}
+    env:
+      FILE: input/${{ matrix.item.file }}
+      KIND: ${{ matrix.item.kind }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: input
+          path: input
+
+      - name: Install the app and open it
+        run: |
+          mkdir -p result work
+          printf 'File: %s\nKind: %s\n' "${{ matrix.item.file }}" "${{ matrix.item.detail }}" > result/result.txt
+          case "$KIND" in
+            mac-installer)
+              sudo installer -pkg "$FILE" -target / 2>&1 | tee result/install.txt
+              echo "Installed the package" >> result/result.txt ;;
+            mac-disk-image)
+              hdiutil attach -nobrowse -mountpoint work/disk "$FILE"
+              pkg="$(find work/disk -maxdepth 2 -name '*.pkg' | head -1)"
+              [ -z "$pkg" ] || sudo installer -pkg "$pkg" -target / | tee result/install.txt
+              app="$(find work/disk -maxdepth 2 -name '*.app' | head -1)" ;;
+            mac-app-zip)
+              ditto -x -k "$FILE" work/unzipped
+              app="$(find work/unzipped -maxdepth 3 -name '*.app' | head -1)" ;;
+          esac
+          if [ -n "${app:-}" ]; then
+            cp -R "$app" /Applications/
+            app="/Applications/$(basename "$app")"
+            xattr -dr com.apple.quarantine "$app" || true
+            open "$app" && echo "Opened $(basename "$app")" >> result/result.txt
+          fi
+          sleep 30
+          ./scripts/screenshot-mac.sh result mac
+          mv result/mac.png result/result.png
+          sed -n 1p result/mac-version.txt >> result/result.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-mac-${{ strategy.job-index }}
+          path: result/
+
+  linux:
+    name: Linux · ${{ matrix.item.file }}
+    needs: route
+    if: needs.route.outputs.linux != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        item: ${{ fromJSON(needs.route.outputs.linux) }}
+    env:
+      FILE: input/${{ matrix.item.file }}
+      KIND: ${{ matrix.item.kind }}
+      EXTRA: ${{ matrix.item.extra }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: input
+          path: input
+
+      - name: Enable KVM
+        if: env.KIND == 'disc-image'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Only what this kind of file needs.
+      - name: Install tools
+        run: |
+          case "$KIND" in
+            disc-image) extra="qemu-system-x86 ipxe-qemu ovmf" ;;
+            game-rom) extra="xvfb xdotool retroarch mesa-vulkan-drivers libgl1-mesa-dri" ;;
+            pdf) extra="poppler-utils" ;;
+            video|audio) extra="ffmpeg" ;;
+            linux-appimage|linux-program) extra="xvfb" ;;
+            linux-rpm) extra="rpm" ;;
+            *) extra="" ;;
+          esac
+          opts="-o Acquire::Retries=3 -o Acquire::http::Timeout=30"
+          for try in 1 2 3; do
+            if [ "$try" -gt 1 ]; then echo "http://archive.ubuntu.com/ubuntu/" | sudo tee /etc/apt/apt-mirrors.txt; fi
+            sudo -E timeout 600 apt-get $opts update -q &&
+            sudo -E DEBIAN_FRONTEND=noninteractive timeout 600 apt-get $opts install -y -q --no-install-recommends python3-pil unzip $extra && break
+            echo "Install try $try failed, trying again"
+            [ "$try" -lt 3 ] || exit 1
+          done
+
+      - name: Open the file
+        run: |
+          sudo mkdir -p /mnt/work && sudo chown "$USER" /mnt/work
+          WORK_DIR=/mnt/work ./scripts/run-file-linux.sh "$FILE" "$KIND" "$EXTRA" result
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-linux-${{ strategy.job-index }}
+          path: result/
+
+  report:
+    name: Report
+    needs: [route, android, windows, mac, linux]
+    if: ${{ !cancelled() && needs.route.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: result-*
+          path: results
+
+      - name: Make the report
+        run: |
+          python3 -m pip install -q pillow 2>/dev/null || true
+          python3 scripts/run-file-report.py results report
+          cat report/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gimmich-run-report
+          path: |
+            report/
+            results/
