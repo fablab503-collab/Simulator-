@@ -94,7 +94,7 @@ if [[ "$CONSOLE" == ps3 ]]; then
   echo "PS3 system software: $fw" | tee -a "$OUT_DIR/version.txt"
   curl -fL --retry 3 -o "$WORK/PS3UPDAT.PUP" "$fw"
   say_yes 40 & yes_pid=$!
-  timeout 900 run --installfw "$WORK/PS3UPDAT.PUP" >"$OUT_DIR/firmware-install.log" 2>&1 || echo "Firmware install ended with $?"
+  timeout 900 flatpak --user run --filesystem="$WORK" "$app_id" --installfw "$WORK/PS3UPDAT.PUP" >"$OUT_DIR/firmware-install.log" 2>&1 || echo "Firmware install ended with $?"
   kill "$yes_pid" 2>/dev/null || true
 fi
 
