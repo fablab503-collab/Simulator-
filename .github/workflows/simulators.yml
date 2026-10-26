@@ -97,7 +97,7 @@ jobs:
           - device: tablet
             profile: pixel_tablet
           - device: foldable
-            profile: pixel_fold
+            profile: auto-fold   # picked below from the folding phones the SDK knows
     steps:
       - uses: actions/checkout@v5
 
@@ -119,13 +119,28 @@ jobs:
           echo "Newest Android API level: $level"
           echo "level=$level" >> "$GITHUB_OUTPUT"
 
+      # The SDK's names for folding phones change over time, so ask it which
+      # ones it has and prefer a Pixel.
+      - name: Find device profile
+        id: profile
+        run: |
+          profile="${{ matrix.profile }}"
+          if [ "$profile" = "auto-fold" ]; then
+            ids="$("$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" list device -c 2>/dev/null)"
+            echo "Folding devices: $(echo "$ids" | grep -i fold | tr '\n' ' ')"
+            profile="$(echo "$ids" | grep -i 'pixel.*fold' | tail -1)"
+            [ -n "$profile" ] || profile="$(echo "$ids" | grep -i fold | head -1)"
+          fi
+          echo "Using device profile: $profile"
+          echo "name=$profile" >> "$GITHUB_OUTPUT"
+
       - name: Boot emulator and take screenshot
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ steps.api.outputs.level }}
           target: google_apis
           arch: x86_64
-          profile: ${{ matrix.profile }}
+          profile: ${{ steps.profile.outputs.name }}
           disable-animations: true
           script: |
             mkdir -p screenshots
@@ -136,7 +151,7 @@ jobs:
             adb shell input keyevent KEYCODE_HOME
             sleep 5
             adb shell getprop ro.build.version.release > screenshots/android-version.txt
-            adb exec-out screencap -p > "screenshots/android-${{ matrix.device }}-${{ matrix.profile }}.png"
+            adb exec-out screencap -p > "screenshots/android-${{ matrix.device }}.png"
             # Folding phones: close it and take a second photo of the outside screen.
             if [ "${{ matrix.device }}" = "foldable" ]; then adb emu fold && sleep 15 && adb exec-out screencap -p > "screenshots/android-foldable-folded.png" || echo "Could not fold"; fi
 
