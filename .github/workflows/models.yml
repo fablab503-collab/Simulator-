@@ -66,6 +66,7 @@ jobs:
 
       - name: Ask the model
         run: |
+          set -o pipefail
           mkdir -p result
           start=$(date +%s)
           ./scripts/ask-model.sh ${{ matrix.model }} test-screen.png \
