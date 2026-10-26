@@ -35,7 +35,14 @@ rm -f "$MON"
 # Old systems (2000s Ubuntu, ReactOS, FreeDOS, Haiku) need an old-style PC:
 # BIOS startup, IDE CD drive and a standard VGA screen. Newer ones get UEFI.
 case "$DISTRO" in
-  ubuntu-4.10|ubuntu-6.06|ubuntu-8.04)
+  ubuntu-4.10)
+    # 2004's kernel freezes on modern virtual CPUs: fully emulate an old
+    # Pentium III instead (slower, so give it 20 minutes).
+    MACHINE=(-machine pc,accel=tcg -cpu pentium3 -smp 1 -m 512 -vga cirrus
+             -nic user,model=ne2k_pci)
+    MINUTES="${3:-20}"
+    ;;
+  ubuntu-6.06|ubuntu-8.04)
     # 2004-2008: also an older graphics card (Cirrus) their drivers know, and
     # more time, because they start slowly.
     MACHINE=(-machine pc,accel=kvm:tcg -cpu qemu64 -smp 1 -m 1024 -vga cirrus

@@ -84,15 +84,22 @@ version="$(flatpak --user info "$app_id" | awk -F': *' '/Version/ {print $2; exi
 echo "$CONSOLE: $app_id $version from Flathub ($note)" | tee "$OUT_DIR/version.txt"
 run() { flatpak --user run --filesystem="$WORK" "$app_id" "$@"; }
 
+# RPCS3 asks "Do you wish to use this (Flatpak) build anyway?" before doing
+# anything. Answer Yes (Alt+Y) for a while so it can carry on.
+say_yes() { for _ in $(seq 1 "${1:-20}"); do xdotool key alt+y 2>/dev/null || true; sleep 3; done; }
+
 if [[ "$CONSOLE" == ps3 ]]; then
   # Sony gives out the PS3 system software for free on its own website.
   fw="$(curl -fsSL https://www.playstation.com/en-us/support/hardware/ps3/system-software/ | grep -oE 'https?://[^"]*PS3UPDAT\.PUP' | head -1)"
   echo "PS3 system software: $fw" | tee -a "$OUT_DIR/version.txt"
   curl -fL --retry 3 -o "$WORK/PS3UPDAT.PUP" "$fw"
+  say_yes 40 & yes_pid=$!
   timeout 900 run --installfw "$WORK/PS3UPDAT.PUP" >"$OUT_DIR/firmware-install.log" 2>&1 || echo "Firmware install ended with $?"
+  kill "$yes_pid" 2>/dev/null || true
 fi
 
 run >"$OUT_DIR/emulator.log" 2>&1 &
+if [[ "$CONSOLE" == ps3 ]]; then say_yes 10 & fi
 sleep 45
 shot "$CONSOLE"
 
@@ -102,6 +109,7 @@ if [[ "$CONSOLE" == ps3 ]]; then
   if [[ -n "$vsh" ]]; then
     pkill -f rpcs3 || true; sleep 3
     run --no-gui "$vsh" >"$OUT_DIR/xmb.log" 2>&1 &
+    say_yes 10 &
     sleep 150
     shot "ps3-xmb"
   else
