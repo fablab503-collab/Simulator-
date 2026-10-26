@@ -20,8 +20,27 @@ jobs:
           # xcode-27 is GitHub's macOS 27 machine with Xcode 27 and the iOS 27 simulators.
           - { name: "27", runner: xcode-27 }
           - { name: "26", runner: macos-26 }
+          # Older versions: GitHub's macOS 15 machine has iOS 18, and Xcode can
+          # download iOS 17 when it's missing.
+          - { name: "18", runner: macos-15, ios: "18" }
+          - { name: "17", runner: macos-15, ios: "17" }
+    env:
+      IOS_MAJOR: ${{ matrix.ios }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Download older iOS if missing
+        if: matrix.ios != ''
+        run: |
+          if xcrun simctl list runtimes | grep -q "^iOS $IOS_MAJOR\."; then
+            echo "iOS $IOS_MAJOR is already installed"
+          else
+            for v in "$IOS_MAJOR.5" "$IOS_MAJOR.4" "$IOS_MAJOR.0"; do
+              echo "Trying to download iOS $v"
+              xcodebuild -downloadPlatform iOS -buildVersion "$v" && break || true
+            done
+          fi
+          xcrun simctl list runtimes
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -167,6 +186,53 @@ jobs:
           name: android-${{ matrix.device }}-screenshots
           path: screenshots/
 
+  # Every older Android, one per version, from Android 5 (2014) to 15.
+  android-history:
+    name: Android API ${{ matrix.api }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [21, 23, 24, 26, 28, 29, 30, 31, 33, 34, 35]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Boot emulator and take screenshot
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel
+          disable-animations: true
+          script: |
+            mkdir -p screenshots
+            sleep 60
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            adb shell input keyevent KEYCODE_HOME
+            sleep 5
+            adb shell getprop ro.build.version.release > screenshots/android-version.txt
+            adb exec-out screencap -p > "screenshots/android-api-${{ matrix.api }}.png"
+
+      - name: List versions
+        if: always()
+        run: |
+          echo "### Android API ${{ matrix.api }}: Android $(cat screenshots/android-version.txt 2>/dev/null)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-api-${{ matrix.api }}-screenshots
+          path: screenshots/
+
   windows:
     name: Windows ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
@@ -202,13 +268,40 @@ jobs:
           path: screenshots/
 
   linux:
-    name: Linux ${{ matrix.distro }}
+    name: Boot ${{ matrix.distro }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        distro: [ubuntu, fedora, debian, mint, arch, opensuse, popos, omarchy]
+        distro:
+          # Newest Linux
+          - ubuntu
+          - fedora
+          - debian
+          - mint
+          - arch
+          - opensuse
+          - popos
+          - omarchy
+          # Older Ubuntu, back to the very first one (2004)
+          - ubuntu-24.04
+          - ubuntu-22.04
+          - ubuntu-20.04
+          - ubuntu-18.04
+          - ubuntu-16.04
+          - ubuntu-14.04
+          - ubuntu-12.04
+          - ubuntu-10.04
+          - ubuntu-8.04
+          - ubuntu-6.06
+          - ubuntu-4.10
+          # Other free systems
+          - reactos
+          - freedos
+          - haiku
+          - freebsd
+          - chromeos
     steps:
       - uses: actions/checkout@v5
 
@@ -221,7 +314,7 @@ jobs:
       - name: Install QEMU
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q qemu-system-x86 ovmf python3-pil
+          sudo apt-get install -y -q qemu-system-x86 ovmf python3-pil unzip
 
       # The ISOs are big, so keep them on the runner's larger /mnt disk.
       - name: Boot newest ${{ matrix.distro }} and take screenshots
@@ -230,21 +323,27 @@ jobs:
           WORK_DIR=/mnt/work ./scripts/boot-linux.sh ${{ matrix.distro }} screenshots 8
 
       - name: List versions
+        id: info
         if: always()
         run: |
-          echo "### Linux $(cat screenshots/version.txt 2>/dev/null || echo '${{ matrix.distro }} (not found)')" >> "$GITHUB_STEP_SUMMARY"
+          case "${{ matrix.distro }}" in
+            reactos|freedos|haiku|freebsd|chromeos) group=other ;;
+            *) group=linux ;;
+          esac
+          echo "group=$group" >> "$GITHUB_OUTPUT"
+          echo "### $(cat screenshots/version.txt 2>/dev/null || echo '${{ matrix.distro }} (not found)')" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: linux-${{ matrix.distro }}-screenshots
+          name: ${{ steps.info.outputs.group }}-${{ matrix.distro }}-screenshots
           path: screenshots/
 
   # Gimmich: collect every system's photos into one download.
   gimmich:
     name: Gimmich (everything in one download)
-    needs: [apple, mac, android, windows, linux]
+    needs: [apple, mac, android, android-history, windows, linux]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -6,11 +6,13 @@ screenshot of each. Everything uses the newest version available.
 
 | Device | Runs on | Tool |
 | --- | --- | --- |
-| iPhone, iPad, Apple Watch (versions 27 and 26) | GitHub's macOS machines | Xcode simulators |
-| Android phone (Pixel 7), tablet (Pixel Tablet) and folding phone (Pixel Fold, open and folded) | GitHub's Linux machine | Android emulator |
+| iPhone, iPad, Apple Watch (versions 27, 26, 18 and 17) | GitHub's macOS machines | Xcode simulators |
+| Android phone, tablet and folding phone (newest), plus every Android from 5 to 15 | GitHub's Linux machine | Android emulator |
 | Mac: macOS 27, Tahoe, Sequoia (Apple M chip) and Sequoia (Intel chip) | GitHub's macOS machines | The real Mac desktop |
 | Windows 11 (ARM), Server 2025, Server 2022 | GitHub's Windows machines | The real Windows desktop |
 | Ubuntu, Fedora, Debian, Mint, Arch, openSUSE, Pop!_OS, Omarchy | GitHub's Linux machine | The newest live ISO, booted in a QEMU virtual machine |
+| Older Ubuntu: 24.04, 22.04, 20.04, 18.04, 16.04, 14.04, 12.04, 10.04, 8.04, 6.06 and 4.10 (the first, 2004) | GitHub's Linux machine | The archived live ISO, in QEMU |
+| ReactOS (free Windows XP look-alike), FreeDOS, Haiku, FreeBSD, ChromeOS Flex | GitHub's Linux machine | Their official free download, in QEMU |
 
 ## Gimmich: everything in one download
 

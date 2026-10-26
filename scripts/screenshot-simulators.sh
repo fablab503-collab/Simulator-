@@ -13,13 +13,22 @@ xcrun simctl list devices available > "$OUT_DIR/available-devices.txt"
 
 DEVICES_JSON="$(xcrun simctl list devices available -j)"
 
+# IOS_MAJOR picks an older iOS (e.g. 17) instead of the newest one. Apple
+# Watch versions went 10 (with iOS 17), 11 (iOS 18), then jumped to 26.
+IOS_MAJOR="${IOS_MAJOR:-}"
+WATCH_MAJOR=""
+if [[ -n "$IOS_MAJOR" ]]; then
+  if (( IOS_MAJOR >= 26 )); then WATCH_MAJOR="$IOS_MAJOR"; else WATCH_MAJOR=$(( IOS_MAJOR - 7 )); fi
+fi
+
 # Prints "<udid><TAB><name>" for the first device whose name starts with
-# PREFIX, using the newest installed runtime for OS (iOS, watchOS, ...).
+# PREFIX, using the newest installed runtime for OS (iOS, watchOS, ...),
+# or the newest one of version MAJOR when that is given.
 pick_device() {
-  local os="$1" prefix="$2"
-  jq -r --arg os "$os" --arg prefix "$prefix" '
+  local os="$1" prefix="$2" major="${3:-}"
+  jq -r --arg os "$os" --arg prefix "$prefix" --arg major "$major" '
     [ .devices | to_entries
-      | map(select(.key | test("SimRuntime\\." + $os + "-")))
+      | map(select(.key | test("SimRuntime\\." + $os + "-" + (if $major == "" then "" else $major + "-" end))))
       | sort_by(.key | split("-")[1:] | map(tonumber))
       | reverse[]
       | .value[]
@@ -30,9 +39,9 @@ pick_device() {
 }
 
 shoot() {
-  local label="$1" os="$2" prefix="$3"
+  local label="$1" os="$2" prefix="$3" major="${4:-}"
   local line udid name
-  line="$(pick_device "$os" "$prefix")"
+  line="$(pick_device "$os" "$prefix" "$major")"
   if [[ -z "$line" ]]; then
     echo "::warning::No $label simulator installed ($os runtime missing), skipping."
     return 0
@@ -59,9 +68,9 @@ shoot() {
   xcrun simctl shutdown "$udid" || true
 }
 
-shoot "iPhone"      iOS     "iPhone"
-shoot "iPad"        iOS     "iPad"
-shoot "Apple Watch" watchOS "Apple Watch"
+shoot "iPhone"      iOS     "iPhone"      "$IOS_MAJOR"
+shoot "iPad"        iOS     "iPad"        "$IOS_MAJOR"
+shoot "Apple Watch" watchOS "Apple Watch" "$WATCH_MAJOR"
 
 echo "Done. Screenshots are in $OUT_DIR/"
 ls -la "$OUT_DIR"

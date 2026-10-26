@@ -16,7 +16,7 @@ src, out = sys.argv[1], sys.argv[2]
 os.makedirs(out, exist_ok=True)
 
 GROUPS = [("apple", "Apple simulators"), ("mac", "Macs"), ("android", "Android"),
-          ("windows", "Windows"), ("linux", "Linux")]
+          ("windows", "Windows"), ("linux", "Linux"), ("other", "Other free systems")]
 
 
 def is_main_photo(folder, name):

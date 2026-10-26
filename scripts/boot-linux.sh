@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Downloads the newest live ISO of one Linux distro, boots it in a QEMU
-# virtual machine, and saves a screenshot every 30 seconds.
-# Usage: boot-linux.sh <distro> <out-dir> [minutes]
-# Needs: qemu-system-x86, ovmf, python3-pil (and /dev/kvm for speed).
+# Downloads the newest live ISO of one system (Linux, older Ubuntu, ReactOS,
+# FreeDOS, Haiku, FreeBSD, ChromeOS Flex), boots it in a QEMU virtual
+# machine, and saves a screenshot every 30 seconds.
+# Usage: boot-linux.sh <system> <out-dir> [minutes]
+# Needs: qemu-system-x86, ovmf, python3-pil, unzip (and /dev/kvm for speed).
 set -euo pipefail
 
 DISTRO="$1"
@@ -13,23 +14,48 @@ WORK="${WORK_DIR:-$PWD/work}"
 mkdir -p "$OUT_DIR" "$WORK"
 
 URL="$("$HERE/linux-iso-url.sh" "$DISTRO")"
-ISO="$WORK/$(basename "$URL")"
+FILE="$(basename "${URL%/download}")"   # SourceForge links end in /download
+MEDIA="$WORK/$FILE"
 echo "Newest $DISTRO: $URL"
-echo "$DISTRO: $(basename "$URL")" > "$OUT_DIR/version.txt"
-[[ -f "$ISO" ]] || curl -fL --retry 5 --retry-delay 10 -o "$ISO" "$URL"
+echo "$DISTRO: $FILE" > "$OUT_DIR/version.txt"
+[[ -f "$MEDIA" ]] || curl -fL --retry 5 --retry-delay 10 -o "$MEDIA" "$URL"
 
-# UEFI firmware with a writable copy of its settings.
-cp /usr/share/OVMF/OVMF_VARS_4M.fd "$WORK/vars.fd"
+# Some systems come zipped: use the CD image (or ChromeOS's disk image) inside,
+# preferring a "live" CD when there is more than one.
+if [[ "$MEDIA" == *.zip ]]; then
+  unzip -o -q "$MEDIA" -d "$WORK/unzipped"
+  MEDIA="$(find "$WORK/unzipped" -type f \( -iname '*live*.iso' -o -iname '*.iso' -o -iname '*.bin' \) | sort | awk 'tolower($0) ~ /live/ {print; found=1; exit} {first = first ? first : $0} END {if (!found) print first}')"
+  echo "Using $(basename "$MEDIA") from the zip"
+fi
+
 MON="$WORK/monitor.sock"
 rm -f "$MON"
 
-qemu-system-x86_64 \
-  -machine q35,accel=kvm:tcg -cpu max -smp 4 -m 6144 \
-  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-  -drive if=pflash,format=raw,file="$WORK/vars.fd" \
-  -cdrom "$ISO" -boot d \
-  -device virtio-vga -display none \
-  -netdev user,id=n0 -device virtio-net-pci,netdev=n0 \
+# Old systems (2000s Ubuntu, ReactOS, FreeDOS, Haiku) need an old-style PC:
+# BIOS startup, IDE CD drive and a standard VGA screen. Newer ones get UEFI.
+case "$DISTRO" in
+  ubuntu-4.10|ubuntu-6.06|ubuntu-8.04|ubuntu-10.04|ubuntu-12.04|ubuntu-14.04|reactos|freedos|haiku)
+    MACHINE=(-machine pc,accel=kvm:tcg -cpu qemu64 -smp 2 -m 2048 -vga std
+             -nic user,model=e1000)
+    ;;
+  *)
+    cp /usr/share/OVMF/OVMF_VARS_4M.fd "$WORK/vars.fd"
+    MACHINE=(-machine q35,accel=kvm:tcg -cpu max -smp 4 -m 6144
+             -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd
+             -drive if=pflash,format=raw,file="$WORK/vars.fd"
+             -device virtio-vga -netdev user,id=n0 -device virtio-net-pci,netdev=n0)
+    ;;
+esac
+
+# ChromeOS Flex is a disk image, not a CD.
+if [[ "$MEDIA" == *.bin ]]; then
+  DISK=(-drive file="$MEDIA",format=raw,if=virtio)
+else
+  DISK=(-cdrom "$MEDIA" -boot d)
+fi
+
+qemu-system-x86_64 "${MACHINE[@]}" "${DISK[@]}" \
+  -display none \
   -monitor unix:"$MON",server,nowait \
   -daemonize -pidfile "$WORK/qemu.pid"
 
@@ -37,11 +63,13 @@ mon() { python3 "$HERE/qemu-monitor.py" "$MON" "$@"; }
 for _ in $(seq 1 30); do [[ -S "$MON" ]] && break; sleep 1; done
 
 # Pick the "start live system" entry in the boot menu. Fedora's default
-# entry checks the disc first (slow), so move up to "Start Fedora".
+# entry checks the disc first (slow), so move up to "Start Fedora". Older
+# Ubuntu CDs first ask for a language, then show their menu: Enter 3 times.
 sleep 12
 case "$DISTRO" in
-  fedora) mon "sendkey up" "sendkey ret" ;;
-  *)      mon "sendkey ret" ;;
+  fedora)    mon "sendkey up" "sendkey ret" ;;
+  ubuntu-*)  mon "sendkey ret"; sleep 3; mon "sendkey ret"; sleep 3; mon "sendkey ret" ;;
+  *)         mon "sendkey ret" ;;
 esac
 
 shots=$(( MINUTES * 2 ))
