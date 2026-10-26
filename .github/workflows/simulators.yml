@@ -320,7 +320,7 @@ jobs:
       - name: Boot newest ${{ matrix.distro }} and take screenshots
         run: |
           sudo mkdir -p /mnt/work && sudo chown "$USER" /mnt/work
-          WORK_DIR=/mnt/work ./scripts/boot-linux.sh ${{ matrix.distro }} screenshots 8
+          WORK_DIR=/mnt/work ./scripts/boot-linux.sh ${{ matrix.distro }} screenshots
 
       - name: List versions
         id: info

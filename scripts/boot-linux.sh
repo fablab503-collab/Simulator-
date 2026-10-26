@@ -34,9 +34,24 @@ rm -f "$MON"
 # Old systems (2000s Ubuntu, ReactOS, FreeDOS, Haiku) need an old-style PC:
 # BIOS startup, IDE CD drive and a standard VGA screen. Newer ones get UEFI.
 case "$DISTRO" in
-  ubuntu-4.10|ubuntu-6.06|ubuntu-8.04|ubuntu-10.04|ubuntu-12.04|ubuntu-14.04|reactos|freedos|haiku)
+  ubuntu-4.10|ubuntu-6.06|ubuntu-8.04)
+    # 2004-2008: also an older graphics card (Cirrus) their drivers know, and
+    # more time, because they start slowly.
+    MACHINE=(-machine pc,accel=kvm:tcg -cpu qemu64 -smp 1 -m 1024 -vga cirrus
+             -nic user,model=e1000)
+    MINUTES="${3:-14}"
+    ;;
+  ubuntu-10.04|ubuntu-12.04|ubuntu-14.04|reactos|freedos|haiku)
     MACHINE=(-machine pc,accel=kvm:tcg -cpu qemu64 -smp 2 -m 2048 -vga std
              -nic user,model=e1000)
+    ;;
+  chromeos)
+    # ChromeOS Flex expects to start from a USB stick, with a plain screen.
+    cp /usr/share/OVMF/OVMF_VARS_4M.fd "$WORK/vars.fd"
+    MACHINE=(-machine q35,accel=kvm:tcg -cpu max -smp 4 -m 6144
+             -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd
+             -drive if=pflash,format=raw,file="$WORK/vars.fd"
+             -device VGA -netdev user,id=n0 -device virtio-net-pci,netdev=n0)
     ;;
   *)
     cp /usr/share/OVMF/OVMF_VARS_4M.fd "$WORK/vars.fd"
@@ -47,9 +62,10 @@ case "$DISTRO" in
     ;;
 esac
 
-# ChromeOS Flex is a disk image, not a CD.
+# ChromeOS Flex is a disk image (a USB stick), not a CD.
 if [[ "$MEDIA" == *.bin ]]; then
-  DISK=(-drive file="$MEDIA",format=raw,if=virtio)
+  DISK=(-drive file="$MEDIA",format=raw,if=none,id=usbstick
+        -device qemu-xhci -device usb-storage,drive=usbstick,bootindex=0)
 else
   DISK=(-cdrom "$MEDIA" -boot d)
 fi

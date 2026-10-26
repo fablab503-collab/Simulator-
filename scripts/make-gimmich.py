@@ -20,8 +20,11 @@ GROUPS = [("apple", "Apple simulators"), ("mac", "Macs"), ("android", "Android")
 
 
 def is_main_photo(folder, name):
-    # Linux keeps one photo every 30 seconds ("ubuntu-07.png"); only the main one counts.
-    return name.endswith(".png") and not re.search(r"-\d\d\.png$", name)
+    # Booted systems keep one photo every 30 seconds ("ubuntu-07.png"); only
+    # their main one counts. (Android's "android-api-21.png" is a main photo.)
+    if folder.startswith(("linux-", "other-")) and re.search(r"-\d\d\.png$", name):
+        return False
+    return name.endswith(".png")
 
 
 tiles = {key: [] for key, _ in GROUPS}

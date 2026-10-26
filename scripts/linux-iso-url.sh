@@ -47,12 +47,14 @@ case "${1:?distro name required}" in
     echo "https://old-releases.ubuntu.com/releases/4.10/warty-release-live-i386.iso" ;;
   ubuntu-*)
     # An older Ubuntu: newest point release, from the current site or the archive.
+    # Ubuntu 6.06's 64-bit version crashes on modern virtual CPUs, so use 32-bit.
     v="${1#ubuntu-}"
-    iso="$(get "https://releases.ubuntu.com/$v/" 2>/dev/null | grep -oE "ubuntu-$v(\.[0-9]+)*-desktop-amd64\.iso" | sort -uV | tail -1 || true)"
+    arch=amd64; [[ "$v" == 6.06 ]] && arch=i386
+    iso="$(get "https://releases.ubuntu.com/$v/" 2>/dev/null | grep -oE "ubuntu-$v(\.[0-9]+)*-desktop-$arch\.iso" | sort -uV | tail -1 || true)"
     if [[ -n "$iso" ]]; then echo "https://releases.ubuntu.com/$v/$iso"; exit 0; fi
     best=""; bestdir=""
     for dir in $(get https://old-releases.ubuntu.com/releases/ | grep -oE "href=\"$v(\.[0-9]+)*/\"" | grep -oE "$v(\.[0-9]+)*" | sort -uV); do
-      cand="$(get "https://old-releases.ubuntu.com/releases/$dir/" | grep -oE "ubuntu-$v(\.[0-9]+)*-desktop-amd64\.iso" | sort -uV | tail -1 || true)"
+      cand="$(get "https://old-releases.ubuntu.com/releases/$dir/" | grep -oE "ubuntu-$v(\.[0-9]+)*-desktop-$arch\.iso" | sort -uV | tail -1 || true)"
       if [[ -n "$cand" ]]; then best="$cand"; bestdir="$dir"; fi
     done
     [[ -n "$best" ]] || exit 1
