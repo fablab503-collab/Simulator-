@@ -10,8 +10,17 @@ OUT="$1"; LABEL="$2"; APK="$3"; SERVER="$4"
 mkdir -p "$OUT"
 shot() { adb exec-out screencap -p > "$OUT/$LABEL - $1.png"; echo "    screenshot: $1"; }
 uploads() { curl -s "$SERVER/studio/api/health" | sed -n 's/.*"uploads": *\([0-9]*\).*/\1/p'; }
-# Tap the on-screen item whose text or description is WORDS (any case); returns 1 if not found.
+# Tap the on-screen item whose text or description is WORDS (any case). Looks again for a few
+# seconds, because dialogs can appear late on a busy emulator; returns 1 if it never shows up.
 tap() {
+  local try
+  for try in 1 2 3 4 5 6; do
+    tap_once "$1" && return 0
+    sleep 2
+  done
+  return 1
+}
+tap_once() {
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 1
   local xy
   xy="$(adb exec-out cat /sdcard/ui.xml | python3 -c '
@@ -51,7 +60,7 @@ adb shell am start -W -a android.intent.action.VIEW -d "gimmich://connect?server
 sleep 5; shot "2 asks before connecting"
 tap "Connect" || echo "    (no 'Connect' question shown)"
 sleep 20
-tap "Got it" && sleep 3          # Android's one-time "Viewing full screen" tip
+tap_once "Got it" && sleep 3     # Android's one-time "Viewing full screen" tip
 shot "3 camera"
 
 echo "--- press the shutter"
@@ -80,7 +89,7 @@ adb shell am set-debug-app --persistent com.android.chrome >/dev/null 2>&1 || tr
 for page in "studio/:5 Studio" "studio/connect/:6 Connect a device"; do
   adb shell am start -W -a android.intent.action.VIEW -d "$SERVER/${page%%:*}" >/dev/null
   sleep 12
-  tap "No thanks" && sleep 3     # Chrome's own "notifications" offer
+  tap_once "No thanks" && sleep 3  # Chrome's own "notifications" offer
   shot "${page#*:}"
 done
 exit $status
