@@ -35,7 +35,8 @@ for folder in sorted(os.listdir(src)):
 with open(os.path.join(out, "report.md"), "w") as f:
     f.write("# Gimmich run report\n\n")
     for name, lines, picture in results:
-        f.write("## %s %s\n\n" % ("✅" if picture else "❌", name))
+        failed = any(l.startswith("Result: failed") for l in lines) or lines[0].startswith("(no result")
+        f.write("## %s %s\n\n" % ("❌" if failed else "✅", name))
         f.write("\n".join("- " + l for l in lines) + "\n\n")
 
 # One picture: a row per file, with what the system showed and its notes.

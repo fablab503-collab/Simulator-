@@ -1,0 +1,300 @@
+name: Run a GitHub project
+
+# Gimmich control for code: give it GitHub repositories; it downloads each
+# one, works out its languages and how to build it (scripts/detect-project.py),
+# then builds and tests it on every system it fits: Linux, Windows, Mac,
+# Android (installs and opens the app), iPhone (simulator) and the web.
+on:
+  workflow_dispatch:
+    inputs:
+      repos:
+        description: "GitHub repositories, e.g. sharkdp/fd or https://github.com/pallets/click (several: separate with spaces)"
+        required: true
+      ref:
+        description: "Branch or tag (optional, same for all)"
+        required: false
+  # Changes to this test themselves on free sample projects.
+  pull_request:
+    paths:
+      - .github/workflows/run-repo.yml
+      - scripts/detect-project.py
+      - scripts/build-project.sh
+
+env:
+  # Private repositories: add a token with read access as the
+  # GIMMICH_GITHUB_TOKEN secret (Settings -> Secrets -> Actions). Never in a file.
+  TOKEN: ${{ secrets.GIMMICH_GITHUB_TOKEN }}
+  REF: ${{ inputs.ref }}
+
+jobs:
+  understand:
+    name: Understand the projects
+    runs-on: ubuntu-latest
+    outputs:
+      linux: ${{ steps.plan.outputs.linux }}
+      windows: ${{ steps.plan.outputs.windows }}
+      mac: ${{ steps.plan.outputs.mac }}
+      android: ${{ steps.plan.outputs.android }}
+      ios: ${{ steps.plan.outputs.ios }}
+      web: ${{ steps.plan.outputs.web }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download and read each project
+        env:
+          REPOS: ${{ github.event_name == 'pull_request' && 'sharkdp/fd pallets/click android/sunflower' || inputs.repos }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p repos
+          for r in $REPOS; do
+            slug="${r#https://github.com/}"; slug="${slug%.git}"; slug="${slug%/}"
+            [[ "$slug" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "::error::Not a GitHub repository: $r"; exit 1; }
+            url="https://github.com/$slug"
+            [ -z "$TOKEN" ] || url="https://x-access-token:$TOKEN@github.com/$slug"
+            git clone -q --depth 1 ${REF:+--branch "$REF"} "$url" "repos/${slug/\//__}"
+            about="$(gh api "repos/$slug" -q .description 2>/dev/null || true)"
+            python3 -I scripts/detect-project.py "repos/${slug/\//__}" --name "$slug" |
+              python3 -c 'import json, sys; p = json.load(sys.stdin); p["about"] = sys.argv[1]; print(json.dumps(p))' "$about" >> plans.jsonl
+          done
+
+      - name: Make the plan
+        id: plan
+        run: |
+          python3 - <<'PY'
+          import json, os
+          plans = [json.loads(l) for l in open("plans.jsonl")]
+          systems = ("linux", "windows", "mac", "android", "ios", "web")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              for s in systems:
+                  mine = [p for plan in plans for p in plan["projects"] if s in p["systems"]]
+                  out.write("%s=%s\n" % (s, json.dumps(mine)))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              for plan in plans:
+                  f.write("### %s\n%s\n\n" % (plan["name"], plan.get("about") or plan["summary"]))
+                  f.write("**Languages:** %s\n\n" % ", ".join("%s %s%%" % (l["name"], l["share"]) for l in plan["languages"]) or "none found")
+                  for p in plan["projects"] or [{"path": ".", "kind": "nothing Gimmich knows how to build yet", "systems": []}]:
+                      f.write("- `%s` %s → %s\n" % (p["path"], p["kind"], ", ".join(p["systems"]) or "—"))
+                  f.write("\n")
+          PY
+          cat plans.jsonl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plan
+          path: plans.jsonl
+
+  desktop:
+    name: ${{ matrix.system }} · ${{ matrix.item.repo }} ${{ matrix.item.path }}
+    needs: understand
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        system: [linux, windows, mac]
+        item: ${{ fromJSON(needs.understand.outputs.linux) }}
+        include:
+          - { system: linux, runner: ubuntu-latest }
+          - { system: windows, runner: windows-2025 }
+          - { system: mac, runner: macos-26 }
+    # (Every desktop project builds on all three; the plan only lists ones that do.)
+    if: needs.understand.outputs.linux != '[]'
+    env:
+      PROJECT: ${{ toJSON(matrix.item) }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      # Skip systems this project doesn't support (e.g. a Makefile project on Windows).
+      - name: Download ${{ matrix.item.repo }}
+        if: contains(matrix.item.systems, matrix.system)
+        run: |
+          url="https://github.com/${{ matrix.item.repo }}"
+          [ -z "$TOKEN" ] || url="https://x-access-token:$TOKEN@github.com/${{ matrix.item.repo }}"
+          git clone -q --depth 1 ${REF:+--branch "$REF"} "$url" project
+      - name: Build and test
+        if: contains(matrix.item.systems, matrix.system)
+        run: ./scripts/build-project.sh project "$PROJECT" result
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-${{ matrix.system }}-${{ strategy.job-index }}
+          path: |
+            result/*.txt
+            result/*.log
+
+  android:
+    name: Android · ${{ matrix.item.repo }} ${{ matrix.item.path }}
+    needs: understand
+    if: needs.understand.outputs.android != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        item: ${{ fromJSON(needs.understand.outputs.android) }}
+    env:
+      PROJECT: ${{ toJSON(matrix.item) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Download ${{ matrix.item.repo }}
+        run: |
+          url="https://github.com/${{ matrix.item.repo }}"
+          [ -z "$TOKEN" ] || url="https://x-access-token:$TOKEN@github.com/${{ matrix.item.repo }}"
+          git clone -q --depth 1 ${REF:+--branch "$REF"} "$url" project
+      - name: Build the app
+        run: |
+          ./scripts/build-project.sh project "$PROJECT" result
+          apk="$(find project -path '*/build/outputs/apk/*' -name '*.apk' ! -name '*androidTest*' | head -1)"
+          echo "APK: $apk"
+          if [ -n "$apk" ]; then cp "$apk" app.apk; else echo "The build made no APK" >> result/result.txt; fi
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # Each line of this script runs on its own, so no multi-line commands.
+      - name: Install the app and open it
+        if: hashFiles('app.apk') != ''
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          script: |
+            sleep 60
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            adb shell pm list packages -3 | tr -d '\r' | sort > before.txt
+            adb install -r -g app.apk 2>&1 | tee result/install.txt
+            adb shell pm list packages -3 | tr -d '\r' | sort > after.txt
+            comm -13 before.txt after.txt | head -1 | cut -d: -f2 > package.txt
+            echo "Installed on Android $(adb shell getprop ro.build.version.release | tr -d '\r'): $(cat package.txt)" >> result/result.txt
+            adb shell monkey -p "$(cat package.txt)" -c android.intent.category.LAUNCHER 1 || echo "Could not open the app" >> result/result.txt
+            sleep 20
+            adb exec-out screencap -p > result/result.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-android-${{ strategy.job-index }}
+          path: |
+            result/*.txt
+            result/*.log
+            result/*.png
+
+  ios:
+    name: iPhone · ${{ matrix.item.repo }} ${{ matrix.item.path }}
+    needs: understand
+    if: needs.understand.outputs.ios != '[]'
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        item: ${{ fromJSON(needs.understand.outputs.ios) }}
+    env:
+      PROJECT: ${{ toJSON(matrix.item) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download ${{ matrix.item.repo }}
+        run: |
+          url="https://github.com/${{ matrix.item.repo }}"
+          [ -z "$TOKEN" ] || url="https://x-access-token:$TOKEN@github.com/${{ matrix.item.repo }}"
+          git clone -q --depth 1 ${REF:+--branch "$REF"} "$url" project
+      - name: Build for the iPhone simulator
+        run: ./scripts/build-project.sh project "$PROJECT" result
+      - name: Install it on a simulator and open it
+        if: hashFiles('result/ios-app.txt') != ''
+        run: |
+          app="$(cat result/ios-app.txt)"
+          bundle="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")"
+          udid="$(xcrun simctl list devices available -j | python3 -c 'import json, sys
+          for runtime, devs in json.load(sys.stdin)["devices"].items():
+              for d in devs:
+                  if "iOS" in runtime and d["name"].startswith("iPhone"):
+                      print(d["udid"]); raise SystemExit')"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$app"
+          xcrun simctl launch "$udid" "$bundle" && echo "Opened $bundle on the iPhone simulator" >> result/result.txt
+          sleep 15
+          xcrun simctl io "$udid" screenshot result/result.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-ios-${{ strategy.job-index }}
+          path: |
+            result/*.txt
+            result/*.log
+            result/*.png
+
+  web:
+    name: Web · ${{ matrix.item.repo }} ${{ matrix.item.path }}
+    needs: understand
+    if: needs.understand.outputs.web != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        item: ${{ fromJSON(needs.understand.outputs.web) }}
+    env:
+      PROJECT: ${{ toJSON(matrix.item) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download ${{ matrix.item.repo }}
+        run: |
+          url="https://github.com/${{ matrix.item.repo }}"
+          [ -z "$TOKEN" ] || url="https://x-access-token:$TOKEN@github.com/${{ matrix.item.repo }}"
+          git clone -q --depth 1 ${REF:+--branch "$REF"} "$url" project
+      - name: Build the website
+        run: |
+          corepack enable 2>/dev/null || true
+          ./scripts/build-project.sh project "$PROJECT" result
+      # Serve the built site (or the folder itself) and photograph it in Chrome.
+      - name: Open it in Chrome
+        run: |
+          dir="project/${{ matrix.item.path }}"
+          site="$(for d in dist build out public .; do [ -f "$dir/$d/index.html" ] && echo "$dir/$d" && break; done)"
+          [ -n "$site" ] || { echo "No index.html found" >> result/result.txt; exit 0; }
+          (cd "$site" && python3 -m http.server 8000 >/dev/null 2>&1 &)
+          sleep 2
+          google-chrome --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1280,800 \
+            --virtual-time-budget=8000 --screenshot="$PWD/result/result.png" http://localhost:8000/ 2>/dev/null
+          echo "Opened ${site#project/} in Chrome" >> result/result.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-web-${{ strategy.job-index }}
+          path: |
+            result/*.txt
+            result/*.log
+            result/*.png
+
+  report:
+    name: Report
+    needs: [understand, desktop, android, ios, web]
+    if: ${{ !cancelled() && needs.understand.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: result-*
+          path: results
+      - name: Make the report
+        run: |
+          python3 scripts/run-file-report.py results report
+          cat report/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gimmich-project-report
+          path: |
+            report/
+            results/

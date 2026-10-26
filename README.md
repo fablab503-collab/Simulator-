@@ -48,6 +48,25 @@ It checks what's *inside* the file first, so a wrong name doesn't fool it
 the file in `inbox/` and push. Download `gimmich-run-report` from the run: one
 picture and one note per file.
 
+## Gimmich control: run any GitHub project
+
+Actions → **Run a GitHub project** → paste one or more repositories (e.g.
+`sharkdp/fd pallets/click`). For each one Gimmich:
+
+1. downloads it and works out **what it's written in** (Rust 97%, Shell 3%, …)
+   and **how to build it** (`scripts/detect-project.py`): Cargo, Go, npm/yarn/pnpm,
+   Python, CMake, Meson, Make, Gradle, Maven, .NET, Swift, Xcode, Flutter, Docker
+   or a plain website, including sub-projects like an Android or iPhone example app;
+2. builds and tests it on every system it fits (`scripts/build-project.sh`):
+   **Linux, Windows and Mac**; **Android** apps are installed and opened in the
+   emulator, **iPhone** apps in the simulator, and **websites** are opened in Chrome;
+3. writes one report (`gimmich-project-report`): what it built, what it made,
+   and whether its tests passed.
+
+Public repositories need nothing. For private ones, add a token with read
+access as the `GIMMICH_GITHUB_TOKEN` secret (never in a file). Gimmich runs
+the project's own build and test commands, so only give it projects you trust.
+
 ## Gimmich models: AI that can use the screens
 
 `models/models.toml` lists 10 open AI models that can look at a screenshot and
