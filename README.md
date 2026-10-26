@@ -6,9 +6,9 @@ screenshot of each. Everything uses the newest version available.
 
 | Device | Runs on | Tool |
 | --- | --- | --- |
-| iPhone, iPad, Apple Watch | GitHub's macOS machine | Xcode simulators |
+| iPhone, iPad, Apple Watch (versions 27 and 26) | GitHub's macOS machines | Xcode simulators |
 | Android phone (Pixel 7) and tablet (Pixel Tablet) | GitHub's Linux machine | Android emulator |
-| Mac: Tahoe, Sequoia, Sonoma (Apple M chip) and Sequoia (Intel chip) | GitHub's macOS machines | The real Mac desktop |
+| Mac: macOS 27, Tahoe, Sequoia (Apple M chip) and Sequoia (Intel chip) | GitHub's macOS machines | The real Mac desktop |
 | Windows | GitHub's Windows machine | The real Windows desktop |
 | Ubuntu, Fedora, Debian, Mint, Arch, openSUSE, Pop!_OS, Omarchy | GitHub's Linux machine | The newest live ISO, booted in a QEMU virtual machine |
 
@@ -48,7 +48,7 @@ pwsh ./scripts/screenshot-windows.ps1       # on Windows (add -MinimizeWindows t
 ## Notes
 
 - There is no "Mac simulator": Mac apps run directly on the Mac, so the Mac rows are real Macs.
-- Older macOS versions (Ventura and earlier) can't run on GitHub. Apple only allows macOS on
+- Older macOS versions (Sonoma and earlier) can't run on GitHub. Apple only allows macOS on
   Apple hardware, and GitHub no longer offers those versions.
 - iPad simulators come with the iOS runtime.
 - Windows is a real Windows machine, not a simulator.

@@ -24,7 +24,7 @@ esac
 # GitHub's Macs have a plain black desktop. Use this macOS version's own
 # wallpaper when it's installed (e.g. "Sequoia" on macOS 15).
 case "$(sw_vers -productVersion | cut -d. -f1)" in
-  26) wall=Tahoe ;; 15) wall=Sequoia ;; 14) wall=Sonoma ;; 13) wall=Ventura ;; *) wall="" ;;
+  27) wall=27 ;; 26) wall=Tahoe ;; 15) wall=Sequoia ;; 14) wall=Sonoma ;; 13) wall=Ventura ;; *) wall="" ;;
 esac
 pic="$(ls "/System/Library/Desktop Pictures/"*"$wall"*.heic 2>/dev/null | head -1 || true)"
 [[ -z "$pic" ]] && pic="$(ls "/System/Library/Desktop Pictures/"*.heic 2>/dev/null | head -1 || true)"
