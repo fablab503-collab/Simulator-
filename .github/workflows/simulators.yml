@@ -395,7 +395,7 @@ jobs:
   gimmich:
     name: Gimmich (everything in one download)
     needs: [apple, mac, android, android-history, windows, linux, games]
-    if: always()
+    if: ${{ !cancelled() }}   # bundle whatever finished, but not on a stopped run
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

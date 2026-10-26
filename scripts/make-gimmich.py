@@ -14,6 +14,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 src, out = sys.argv[1], sys.argv[2]
+os.makedirs(src, exist_ok=True)   # no photos at all still makes an (empty) bundle
 os.makedirs(out, exist_ok=True)
 
 GROUPS = [("apple", "Apple simulators"), ("mac", "Macs"), ("android", "Android"),
