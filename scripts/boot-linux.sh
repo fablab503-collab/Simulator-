@@ -48,23 +48,33 @@ shots=$(( MINUTES * 2 ))
 for i in $(seq 1 "$shots"); do
   sleep 30
   n=$(printf '%02d' "$i")
-  mon "screendump $WORK/$DISTRO-$n.ppm"
+  # Nudge the mouse so the screen doesn't go to sleep or lock.
+  mon "mouse_move 5 5" "mouse_move -5 -5" "screendump $WORK/$DISTRO-$n.ppm"
 done
 sleep 1
 
-# QEMU saves PPM images; turn them into PNG and keep the last as the main photo.
+# QEMU saves PPM images; turn them into PNG. The main photo is the last one
+# that isn't a blank screen (like "Display output is not active").
 python3 - "$WORK" "$OUT_DIR" "$DISTRO" <<'PY'
 import glob, os, shutil, sys
 from PIL import Image
 work, out, distro = sys.argv[1:]
-pngs = []
+def blank(im):
+    small = im.convert("L").resize((320, 200))
+    lit = sum(small.histogram()[41:])
+    return lit < 0.005 * 320 * 200
+pngs, good = [], []
 for ppm in sorted(glob.glob(os.path.join(work, distro + "-*.ppm"))):
     png = os.path.join(out, os.path.basename(ppm)[:-4] + ".png")
-    Image.open(ppm).save(png)
+    im = Image.open(ppm)
+    im.save(png)
     pngs.append(png)
-if pngs:
-    shutil.copy(pngs[-1], os.path.join(out, distro + ".png"))
-print("Converted", len(pngs), "screenshots")
+    if not blank(im):
+        good.append(png)
+main = (good or pngs)[-1:]
+if main:
+    shutil.copy(main[0], os.path.join(out, distro + ".png"))
+print("Converted", len(pngs), "screenshots;", len(good), "show something; main photo:", main)
 PY
 
 kill "$(cat "$WORK/qemu.pid")" 2>/dev/null || true
