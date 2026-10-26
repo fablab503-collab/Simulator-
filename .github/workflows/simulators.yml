@@ -352,17 +352,22 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # The package installer sometimes stalls on a slow mirror: never let it
-      # wait for input, give each try 10 minutes, and try up to 3 times.
+      # Install only what this console needs (no ImageMagick: it pulls in big
+      # font packages that stalled on a slow mirror). A stalled download gives
+      # up after 30 seconds and retries; each try gets 10 minutes, up to 3 tries.
       - name: Install emulator tools
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+          case "${{ matrix.console }}" in
+            ps2|ps3|ps4) extra=flatpak ;;
+            *)           extra=retroarch ;;
+          esac
+          opts="-o Acquire::Retries=3 -o Acquire::http::Timeout=30"
           for try in 1 2 3; do
-            sudo -E timeout 600 apt-get -o Acquire::Retries=3 update -q &&
-            sudo -E timeout 600 apt-get -o Acquire::Retries=3 install -y -q --no-install-recommends \
-              xvfb imagemagick xdotool retroarch unzip \
-              mesa-vulkan-drivers libgl1-mesa-dri flatpak && break
+            sudo -E timeout 600 apt-get $opts update -q &&
+            sudo -E timeout 600 apt-get $opts install -y -q --no-install-recommends \
+              xvfb xdotool unzip python3-pil mesa-vulkan-drivers libgl1-mesa-dri $extra && break
             echo "Install try $try failed, trying again"; sleep 15
           done
 

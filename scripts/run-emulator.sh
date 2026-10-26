@@ -7,7 +7,8 @@
 # Usage: run-emulator.sh <console> <out-dir>
 #   nes snes gb gba genesis ps1 psp gamecube   (RetroArch + a homebrew game)
 #   ps2 ps3 ps4                                (the standalone emulator's own screen)
-# Needs: xvfb, imagemagick, xdotool, retroarch, unzip, flatpak (for ps2/ps3/ps4).
+# Needs: xvfb, xdotool, python3-pil, unzip, and retroarch (retro consoles)
+# or flatpak (ps2/ps3/ps4).
 set -euo pipefail
 
 CONSOLE="$1"
@@ -39,7 +40,10 @@ export DISPLAY=:99
 Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &
 sleep 3
 
-shot() { import -window root "$OUT_DIR/$1.png"; echo "Saved $1.png"; }
+shot() {
+  python3 -c "from PIL import ImageGrab; ImageGrab.grab(xdisplay='$DISPLAY').save('$OUT_DIR/$1.png')"
+  echo "Saved $1.png"
+}
 
 if [[ -n "$core" ]]; then
   curl -fsSL --retry 3 -o "$WORK/core.zip" "$CORES/${core}_libretro.so.zip"
