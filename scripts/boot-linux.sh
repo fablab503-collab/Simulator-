@@ -102,6 +102,8 @@ for i in $(seq 1 "$shots"); do
   n=$(printf '%02d' "$i")
   # Nudge the mouse and tap Shift so the screen doesn't go to sleep or lock
   # (KDE ignores mouse nudges, but counts a key press as activity).
+  # Ubuntu 8.04 shows a harmless "settings daemon" error popup: Escape closes it.
+  [[ "$DISTRO" == ubuntu-8.04 ]] && mon "sendkey esc"
   mon "mouse_move 5 5" "mouse_move -5 -5" "sendkey shift" "screendump $WORK/$DISTRO-$n.ppm"
 done
 sleep 1
