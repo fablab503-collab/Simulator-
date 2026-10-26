@@ -340,10 +340,47 @@ jobs:
           name: ${{ steps.info.outputs.group }}-${{ matrix.distro }}-screenshots
           path: screenshots/
 
+  # Game console emulators, with free homebrew games only.
+  games:
+    name: Game ${{ matrix.console }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        console: [nes, snes, gb, gba, genesis, ps1, psp, gamecube, ps2, ps3, ps4]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install emulator tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q xvfb imagemagick xdotool retroarch unzip \
+            mesa-vulkan-drivers libgl1-mesa-dri libfuse2t64 libxcb-cursor0 \
+            libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-xinerama0
+
+      - name: Run ${{ matrix.console }} emulator
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/run-emulator.sh ${{ matrix.console }} screenshots
+
+      - name: List versions
+        if: always()
+        run: |
+          echo "### Game $(cat screenshots/version.txt 2>/dev/null || echo '${{ matrix.console }} (not found)')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: games-${{ matrix.console }}-screenshots
+          path: screenshots/
+
   # Gimmich: collect every system's photos into one download.
   gimmich:
     name: Gimmich (everything in one download)
-    needs: [apple, mac, android, android-history, windows, linux]
+    needs: [apple, mac, android, android-history, windows, linux, games]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 15

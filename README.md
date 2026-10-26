@@ -13,6 +13,8 @@ screenshot of each. Everything uses the newest version available.
 | Ubuntu, Fedora, Debian, Mint, Arch, openSUSE, Pop!_OS, Omarchy | GitHub's Linux machine | The newest live ISO, booted in a QEMU virtual machine |
 | Older Ubuntu: 24.04, 22.04, 20.04, 18.04, 16.04, 14.04, 12.04, 10.04, 8.04, 6.06 and 4.10 (the first, 2004) | GitHub's Linux machine | The archived live ISO, in QEMU |
 | ReactOS (free Windows XP look-alike), FreeDOS, Haiku, FreeBSD, ChromeOS Flex | GitHub's Linux machine | Their official free download, in QEMU |
+| Game consoles: NES, SNES, Game Boy, GBA, Sega Genesis, PS1, PSP, GameCube | GitHub's Linux machine | RetroArch running a free homebrew game from libretro |
+| PS2 (PCSX2), PS3 (RPCS3 + Sony's free system software), PS4 (shadPS4) | GitHub's Linux machine | The emulator's own screen |
 
 ## Gimmich: everything in one download
 
@@ -62,6 +64,8 @@ pwsh ./scripts/screenshot-windows.ps1       # on Windows (add -MinimizeWindows t
 - Older macOS versions (Sonoma and earlier) can't run on GitHub. Apple only allows macOS on
   Apple hardware, and GitHub no longer offers those versions.
 - iPad simulators come with the iOS runtime.
+- Game consoles use only free homebrew games and Sony's free PS3 system software. No
+  commercial games or console BIOS files are downloaded. There is no real PS5 emulator.
 - Windows is a real Windows machine, not a simulator. Older Windows (XP, Vista, 7, 8)
   isn't included: Microsoft no longer offers it for download and it gets no security fixes.
 - Linux screenshots show the live (try-before-install) desktop. Arch has no desktop

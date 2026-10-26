@@ -16,13 +16,16 @@ src, out = sys.argv[1], sys.argv[2]
 os.makedirs(out, exist_ok=True)
 
 GROUPS = [("apple", "Apple simulators"), ("mac", "Macs"), ("android", "Android"),
-          ("windows", "Windows"), ("linux", "Linux"), ("other", "Other free systems")]
+          ("windows", "Windows"), ("linux", "Linux"), ("other", "Other free systems"),
+          ("games", "Game consoles (free homebrew only)")]
 
 
 def is_main_photo(folder, name):
     # Booted systems keep one photo every 30 seconds ("ubuntu-07.png"); only
     # their main one counts. (Android's "android-api-21.png" is a main photo.)
     if folder.startswith(("linux-", "other-")) and re.search(r"-\d\d\.png$", name):
+        return False
+    if folder.startswith("games-") and re.search(r"-1\.png$", name):
         return False
     return name.endswith(".png")
 
