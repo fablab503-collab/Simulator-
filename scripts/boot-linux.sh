@@ -18,7 +18,8 @@ FILE="$(basename "${URL%/download}")"   # SourceForge links end in /download
 MEDIA="$WORK/$FILE"
 echo "Newest $DISTRO: $URL"
 echo "$DISTRO: $FILE" > "$OUT_DIR/version.txt"
-[[ -f "$MEDIA" ]] || curl -fL --retry 5 --retry-delay 10 -o "$MEDIA" "$URL"
+# Big downloads sometimes break halfway: retry any error and resume where it stopped.
+[[ -f "$MEDIA" ]] || curl -fL --http1.1 --retry 8 --retry-delay 10 --retry-all-errors -C - -o "$MEDIA" "$URL"
 
 # Some systems come zipped: use the CD image (or ChromeOS's disk image) inside,
 # preferring a "live" CD when there is more than one.
