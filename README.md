@@ -14,7 +14,7 @@ screenshot of each. Everything uses the newest version available.
 | Older Ubuntu: 24.04, 22.04, 20.04, 18.04, 16.04, 14.04, 12.04, 10.04, 8.04, 6.06 and 4.10 (the first, 2004) | GitHub's Linux machine | The archived live ISO, in QEMU |
 | ReactOS (free Windows XP look-alike), FreeDOS, Haiku, FreeBSD, ChromeOS Flex | GitHub's Linux machine | Their official free download, in QEMU |
 | Game consoles: NES, SNES, Game Boy, GBA, Sega Genesis, PS1, PSP, GameCube | GitHub's Linux machine | RetroArch running a free homebrew game from libretro |
-| PS2 (PCSX2), PS3 (RPCS3 + Sony's free system software), PS4 (shadPS4) | GitHub's Linux machine | The emulator's own screen |
+| PS2 (PCSX2), PS3 (RPCS3 + Sony's free system software), PS4 (shadPS4) | GitHub's Linux machine | The emulator's own screen, installed from Flathub |
 
 ## Gimmich: everything in one download
 

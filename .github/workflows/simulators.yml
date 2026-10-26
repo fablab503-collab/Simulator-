@@ -356,13 +356,9 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q xvfb imagemagick xdotool retroarch unzip \
-            mesa-vulkan-drivers libgl1-mesa-dri libfuse2t64 libxcb-cursor0 \
-            libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
-            libxcb-render-util0 libxcb-xinerama0
+            mesa-vulkan-drivers libgl1-mesa-dri flatpak
 
       - name: Run ${{ matrix.console }} emulator
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: ./scripts/run-emulator.sh ${{ matrix.console }} screenshots
 
       - name: List versions

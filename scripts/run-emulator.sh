@@ -7,14 +7,13 @@
 # Usage: run-emulator.sh <console> <out-dir>
 #   nes snes gb gba genesis ps1 psp gamecube   (RetroArch + a homebrew game)
 #   ps2 ps3 ps4                                (the standalone emulator's own screen)
-# Needs: xvfb, imagemagick, xdotool, retroarch, unzip, gh (for ps2/ps3/ps4).
+# Needs: xvfb, imagemagick, xdotool, retroarch, unzip, flatpak (for ps2/ps3/ps4).
 set -euo pipefail
 
 CONSOLE="$1"
 OUT_DIR="$2"
 WORK="${WORK_DIR:-$PWD/work}"
 mkdir -p "$OUT_DIR" "$WORK"
-export APPIMAGE_EXTRACT_AND_RUN=1   # run AppImages without FUSE
 
 CORES=https://buildbot.libretro.com/nightly/linux/x86_64/latest
 GAMES=https://buildbot.libretro.com/assets/cores
@@ -72,55 +71,37 @@ CFG
   exit 0
 fi
 
-# Downloads the newest release file from a GitHub project whose name matches
-# REGEX (case-insensitive). The list of files is printed, so a mismatch is
-# easy to fix. Usage: fetch_release <owner/repo> <regex>
-fetch_release() {
-  local repo="$1" regex="$2" names name
-  names="$(gh release view -R "$repo" --json assets --jq '.assets[].name' 2>/dev/null || true)"
-  { echo "Files in the newest $repo release:"; echo "$names" | sed 's/^/  /'; } >&2
-  name="$(echo "$names" | grep -iE "$regex" | head -1 || true)"
-  [[ -n "$name" ]] || return 1
-  gh release download -R "$repo" --pattern "$name" -D "$WORK" --clobber >&2
-  echo "$WORK/$name"
-}
-
-# Standalone PlayStation emulators, downloaded from their official releases.
+# Standalone PlayStation emulators, installed from Flathub (the official
+# Linux app store). Flathub builds bring every library they need.
 case "$CONSOLE" in
-  ps2)
-    app="$(fetch_release PCSX2/pcsx2 'linux.*x64.*\.AppImage$' | tail -1)"
-    echo "ps2: PCSX2 $(basename "$app") (needs a BIOS from your own PS2 to play)" | tee "$OUT_DIR/version.txt"
-    ;;
-  ps3)
-    app="$(fetch_release RPCS3/rpcs3-binaries-linux '(x86_64|linux).*\.AppImage$|\.AppImage$' | tail -1)"
-    # Sony gives out the PS3 system software for free on its own website.
-    fw="$(curl -fsSL https://www.playstation.com/en-us/support/hardware/ps3/system-software/ | grep -oE 'https?://[^"]*PS3UPDAT\.PUP' | head -1)"
-    echo "ps3: RPCS3 $(basename "$app") + Sony PS3 system software ($fw)" | tee "$OUT_DIR/version.txt"
-    curl -fL --retry 3 -o "$WORK/PS3UPDAT.PUP" "$fw"
-    chmod +x "$app"
-    timeout 600 "$app" --installfw "$WORK/PS3UPDAT.PUP" >"$OUT_DIR/firmware-install.log" 2>&1 || echo "Firmware install ended with $?"
-    ;;
-  ps4)
-    # shadPS4's window (the "Qt launcher") lives in its own project now; fall
-    # back to the main project's Linux build.
-    file="$(fetch_release shadps4-emu/shadps4-qtlauncher 'linux' | tail -1)" \
-      || file="$(fetch_release shadps4-emu/shadPS4 'linux.*qt|linux' | tail -1)"
-    [[ "$file" == *.zip ]] && unzip -o -q "$file" -d "$WORK/ps4"
-    app="$(find "$WORK" -iname '*.AppImage' | head -1)"
-    echo "ps4: shadPS4 $(basename "$app") (needs files from your own PS4 to play)" | tee "$OUT_DIR/version.txt"
-    ;;
+  ps2) app_id=net.pcsx2.PCSX2;        note="needs a BIOS from your own PS2 to play" ;;
+  ps3) app_id=net.rpcs3.RPCS3;        note="with Sony's free PS3 system software" ;;
+  ps4) app_id=net.shadps4.shadPS4;    note="needs files from your own PS4 to play" ;;
 esac
-chmod +x "$app"
-"$app" >"$OUT_DIR/emulator.log" 2>&1 &
-sleep 40
+flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak --user install -y --noninteractive flathub "$app_id"
+version="$(flatpak --user info "$app_id" | awk -F': *' '/Version/ {print $2; exit}')"
+echo "$CONSOLE: $app_id $version from Flathub ($note)" | tee "$OUT_DIR/version.txt"
+run() { flatpak --user run --filesystem="$WORK" "$app_id" "$@"; }
+
+if [[ "$CONSOLE" == ps3 ]]; then
+  # Sony gives out the PS3 system software for free on its own website.
+  fw="$(curl -fsSL https://www.playstation.com/en-us/support/hardware/ps3/system-software/ | grep -oE 'https?://[^"]*PS3UPDAT\.PUP' | head -1)"
+  echo "PS3 system software: $fw" | tee -a "$OUT_DIR/version.txt"
+  curl -fL --retry 3 -o "$WORK/PS3UPDAT.PUP" "$fw"
+  timeout 900 run --installfw "$WORK/PS3UPDAT.PUP" >"$OUT_DIR/firmware-install.log" 2>&1 || echo "Firmware install ended with $?"
+fi
+
+run >"$OUT_DIR/emulator.log" 2>&1 &
+sleep 45
 shot "$CONSOLE"
 
 # PS3: also try starting the PS3's own home menu (the XMB) from the system software.
 if [[ "$CONSOLE" == ps3 ]]; then
-  vsh="$(find "$HOME/.config/rpcs3" -path '*dev_flash/vsh/module/vsh.self' 2>/dev/null | head -1)"
+  vsh="$(find "$HOME/.var/app/$app_id" "$HOME/.config/rpcs3" -path '*dev_flash/vsh/module/vsh.self' 2>/dev/null | head -1 || true)"
   if [[ -n "$vsh" ]]; then
     pkill -f rpcs3 || true; sleep 3
-    "$app" --no-gui "$vsh" >"$OUT_DIR/xmb.log" 2>&1 &
+    run --no-gui "$vsh" >"$OUT_DIR/xmb.log" 2>&1 &
     sleep 150
     shot "ps3-xmb"
   else
