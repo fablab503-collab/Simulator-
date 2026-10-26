@@ -8,6 +8,7 @@ screenshot of each. Everything uses the newest version available.
 | --- | --- | --- |
 | iPhone, iPad, Apple Watch | GitHub's macOS machine | Xcode simulators |
 | Android phone (Pixel 7) and tablet (Pixel Tablet) | GitHub's Linux machine | Android emulator |
+| Mac: Tahoe, Sequoia, Sonoma (Apple M chip) and Sequoia (Intel chip) | GitHub's macOS machines | The real Mac desktop |
 | Windows | GitHub's Windows machine | The real Windows desktop |
 | Ubuntu, Fedora, Debian, Mint, Arch, openSUSE, Pop!_OS, Omarchy | GitHub's Linux machine | The newest live ISO, booted in a QEMU virtual machine |
 
@@ -33,6 +34,7 @@ screenshot of each. Everything uses the newest version available.
 - `scripts/screenshot-simulators.sh`: boots the newest iPhone, iPad and
   Apple Watch simulators, screenshots them, and lists every installed runtime.
 - `scripts/screenshot-windows.ps1`: screenshots the Windows desktop.
+- `scripts/screenshot-mac.sh`: screenshots a Mac desktop and records its macOS version and chip.
 - `scripts/linux-iso-url.sh`: finds the newest download for each Linux.
 - `scripts/boot-linux.sh`: boots that Linux in a virtual machine and screenshots it every 30 seconds.
 
@@ -45,7 +47,9 @@ pwsh ./scripts/screenshot-windows.ps1       # on Windows (add -MinimizeWindows t
 
 ## Notes
 
-- There is no "Mac simulator": Mac apps run directly on the Mac.
+- There is no "Mac simulator": Mac apps run directly on the Mac, so the Mac rows are real Macs.
+- Older macOS versions (Ventura and earlier) can't run on GitHub. Apple only allows macOS on
+  Apple hardware, and GitHub no longer offers those versions.
 - iPad simulators come with the iOS runtime.
 - Windows is a real Windows machine, not a simulator.
 - Linux screenshots show the live (try-before-install) desktop. Arch has no desktop

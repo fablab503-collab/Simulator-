@@ -40,6 +40,43 @@ jobs:
           name: apple-screenshots
           path: screenshots/
 
+  mac:
+    name: Mac ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple M-series chips
+          - { name: "Tahoe (M)", runner: macos-26, file: tahoe-m }
+          - { name: "Sequoia (M)", runner: macos-15, file: sequoia-m }
+          - { name: "Sonoma (M)", runner: macos-14, file: sonoma-m }
+          # Intel chip, like Macs from before 2020
+          - { name: "Sequoia (Intel)", runner: macos-15-intel, file: sequoia-intel }
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Take desktop screenshot
+        run: ./scripts/screenshot-mac.sh screenshots mac-${{ matrix.file }}
+
+      - name: List versions
+        if: always()
+        run: |
+          {
+            echo "### Mac ${{ matrix.name }}"
+            echo '```'
+            cat screenshots/mac-${{ matrix.file }}-version.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.file }}-screenshots
+          path: screenshots/
+
   android:
     name: Android ${{ matrix.device }}
     runs-on: ubuntu-latest
