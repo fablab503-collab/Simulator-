@@ -89,9 +89,14 @@ def is_main_photo(folder, name):
     return name.endswith(".png")
 
 
+def natural(name):
+    """Sort key that puts 'ubuntu-4.10' before 'ubuntu-10.04'."""
+    return [int(p) if p.isdigit() else p for p in re.split(r"(\d+)", name)]
+
+
 tiles = {key: [] for key, _ in GROUPS}
 versions = []
-for folder in sorted(os.listdir(src)):
+for folder in sorted(os.listdir(src), key=natural):
     path = os.path.join(src, folder)
     if not os.path.isdir(path):
         continue
@@ -133,6 +138,13 @@ for folder in sorted(os.listdir(src)):
                 # "iPhone - iPhone Duo (screen 3)" -> "iPhone Duo (screen 3) · iOS 27.1"
                 device = stem.split(" - ", 1)[-1]
                 v = next((v for p, v in devices.items() if stem.startswith(p)), "")
+                if not v and system.split("-")[-1].isdigit():
+                    # Older runs have no devices.txt: use the group's major version.
+                    major = int(system.split("-")[-1])
+                    if stem.startswith("Apple Watch"):
+                        v = "watchOS %d" % (major if major >= 26 else major - 7)
+                    else:
+                        v = ("iPadOS %d" if stem.startswith("iPad") else "iOS %d") % major
                 title = " · ".join(x for x in [device, v] if x)
             else:
                 title = version or system
