@@ -69,7 +69,16 @@ shoot() {
   if ! xcrun simctl io "$udid" screenshot "$OUT_DIR/$label - $name.png" 2>"$err"; then
     local displays
     displays="$(grep -oE -- '--display=[0-9]+' "$err" | grep -oE '[0-9]+' || true)"
-    if [[ -z "$displays" ]]; then cat "$err" >&2; rm -f "$err"; return 1; fi
+    if [[ -z "$displays" ]]; then
+      # Some versions name no screens ("no 'default' display port"): try the
+      # inside screen, and skip the device if that fails too.
+      if ! xcrun simctl io "$udid" screenshot --display=internal "$OUT_DIR/$label - $name.png"; then
+        cat "$err" >&2
+        echo "::warning::$label ($name): could not take a screenshot, skipping."
+      fi
+      rm -f "$err"; xcrun simctl shutdown "$udid" || true
+      return 0
+    fi
     for d in $displays; do
       xcrun simctl io "$udid" screenshot --display="$d" "$OUT_DIR/$label - $name (screen $d).png"
     done
