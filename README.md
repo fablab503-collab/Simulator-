@@ -48,6 +48,14 @@ It checks what's *inside* the file first, so a wrong name doesn't fool it
 the file in `inbox/` and push. Download `gimmich-run-report` from the run: one
 picture and one note per file.
 
+## Gimmich models: AI that can use the screens
+
+`models/models.toml` lists 10 open AI models that can look at a screenshot and
+decide what to click: UI-TARS, OpenCUA, Fara, Qwen-VL, CogAgent and AutoGLM.
+The orchestrator picks one per system (`scripts/get-model.py pick android`)
+and asks it about a screen with `scripts/ask-model.sh`. See
+[models/README.md](models/README.md).
+
 ## How to use it
 
 1. Open the **Actions** tab of this repository.

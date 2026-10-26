@@ -1,0 +1,83 @@
+name: Models
+
+# Gimmich's AI models (models/models.toml): checks every Monday whether a
+# newer version is out, and makes sure each compressed model downloads and can
+# read a screen.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "47 6 * * 1"
+  pull_request:
+    paths:
+      - .github/workflows/models.yml
+      - models/**
+      - scripts/get-model.py
+      - scripts/ask-model.sh
+
+jobs:
+  versions:
+    name: Newest versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check for updates
+        run: |
+          python3 scripts/get-model.py list
+          { echo "### Gimmich models"; python3 scripts/get-model.py check; } | tee models-versions.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: models-versions
+          path: models-versions.md
+
+  try:
+    name: Try ${{ matrix.model }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every model with a compressed copy (the others need a GPU).
+        model: [qwen3-vl-4b, qwen3-vl-8b, qwen2.5-vl-3b, qwen2.5-vl-7b, ui-tars-7b, fara-7b, autoglm-phone-9b]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MODELS_DIR: /mnt/models
+    steps:
+      - uses: actions/checkout@v5
+
+      # A screen with two buttons; the model has to say which one installs the app.
+      - name: Draw a test screen
+        run: |
+          sudo mkdir -p /mnt/models && sudo chown "$USER" /mnt/models
+          python3 -m pip install -q pillow 2>/dev/null || true
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw, ImageFont
+          f = lambda s: ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", s)
+          im = Image.new("RGB", (1280, 800), (30, 40, 60))
+          d = ImageDraw.Draw(im)
+          d.rounded_rectangle([340, 220, 940, 580], 24, fill="white")
+          d.text((390, 260), "Install Gimmich Notes?", font=f(40), fill="black")
+          d.text((390, 330), "It needs 12 MB of space.", font=f(28), fill=(90, 90, 90))
+          d.rounded_rectangle([390, 460, 620, 540], 16, fill=(220, 220, 225))
+          d.text((445, 480), "Cancel", font=f(32), fill="black")
+          d.rounded_rectangle([660, 460, 890, 540], 16, fill=(30, 110, 230))
+          d.text((715, 480), "Install", font=f(32), fill="white")
+          im.save("test-screen.png")
+          PY
+
+      - name: Ask the model
+        run: |
+          mkdir -p result
+          start=$(date +%s)
+          ./scripts/ask-model.sh ${{ matrix.model }} test-screen.png \
+            "Which button installs the app? Answer with the button's label only." | tee result/answer.txt
+          echo "Took $(( $(date +%s) - start )) seconds" | tee -a result/answer.txt
+          cp "$MODELS_DIR/${{ matrix.model }}/last-run.log" result/ || true
+          answer="$(head -c 300 result/answer.txt | tr '\n' ' ')"
+          echo "### ${{ matrix.model }}: $answer" >> "$GITHUB_STEP_SUMMARY"
+          grep -qi install result/answer.txt || { echo "::error::The model did not pick Install"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: model-${{ matrix.model }}
+          path: result/
