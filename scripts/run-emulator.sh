@@ -114,7 +114,11 @@ if [[ "$CONSOLE" == ps3 ]]; then
     pkill -f rpcs3 || true; sleep 3
     run --no-gui "$vsh" >"$OUT_DIR/xmb.log" 2>&1 &
     say_yes 10 &
-    sleep 150
+    # Without a graphics card the PS3 home menu is drawn in software, which is
+    # slow: photograph it after 3 and after 6 minutes.
+    sleep 180
+    shot "ps3-xmb-3min"
+    sleep 180
     shot "ps3-xmb"
   else
     echo "PS3 home menu not found (system software did not install)"

@@ -365,6 +365,11 @@ jobs:
           esac
           opts="-o Acquire::Retries=3 -o Acquire::http::Timeout=30"
           for try in 1 2 3; do
+            # GitHub's Azure mirror keeps stalling on RetroArch's font packages:
+            # from the second try on, use Ubuntu's main archive instead.
+            if [ "$try" -gt 1 ]; then
+              echo "http://archive.ubuntu.com/ubuntu/" | sudo tee /etc/apt/apt-mirrors.txt
+            fi
             sudo -E timeout 600 apt-get $opts update -q &&
             sudo -E timeout 600 apt-get $opts install -y -q --no-install-recommends \
               xvfb xdotool unzip python3-pil mesa-vulkan-drivers libgl1-mesa-dri $extra && break
@@ -390,7 +395,7 @@ jobs:
   gimmich:
     name: Gimmich (everything in one download)
     needs: [apple, mac, android, android-history, windows, linux, games]
-    if: always()
+    if: ${{ !cancelled() }}   # bundle whatever finished, but not on a stopped run
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
