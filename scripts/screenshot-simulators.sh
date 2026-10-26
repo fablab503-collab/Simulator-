@@ -44,7 +44,18 @@ shoot() {
   xcrun simctl boot "$udid" || true          # ignore "already booted"
   xcrun simctl bootstatus "$udid" -b
   sleep 10                                    # let the home screen settle
-  xcrun simctl io "$udid" screenshot "$OUT_DIR/$label - $name.png"
+  # Devices with more than one screen (like a folding iPhone) need each
+  # screen named; simctl lists them when the plain screenshot fails.
+  local err="$OUT_DIR/.screenshot-error.txt"
+  if ! xcrun simctl io "$udid" screenshot "$OUT_DIR/$label - $name.png" 2>"$err"; then
+    local displays
+    displays="$(grep -oE -- '--display=[0-9]+' "$err" | grep -oE '[0-9]+' || true)"
+    if [[ -z "$displays" ]]; then cat "$err" >&2; rm -f "$err"; return 1; fi
+    for d in $displays; do
+      xcrun simctl io "$udid" screenshot --display="$d" "$OUT_DIR/$label - $name (screen $d).png"
+    done
+  fi
+  rm -f "$err"
   xcrun simctl shutdown "$udid" || true
 }
 
