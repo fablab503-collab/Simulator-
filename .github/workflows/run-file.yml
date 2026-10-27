@@ -33,7 +33,7 @@ jobs:
       mac: ${{ steps.route.outputs.mac }}
       linux: ${{ steps.route.outputs.linux }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
@@ -92,7 +92,7 @@ jobs:
     env:
       FILE: input/${{ matrix.item.file }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: input
@@ -155,7 +155,7 @@ jobs:
       FILE: input/${{ matrix.item.file }}
       KIND: ${{ matrix.item.kind }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: input
@@ -204,7 +204,7 @@ jobs:
       FILE: input/${{ matrix.item.file }}
       KIND: ${{ matrix.item.kind }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: input
@@ -259,7 +259,7 @@ jobs:
       KIND: ${{ matrix.item.kind }}
       EXTRA: ${{ matrix.item.extra }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           name: input
@@ -310,7 +310,7 @@ jobs:
     if: ${{ !cancelled() && needs.route.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           pattern: result-*

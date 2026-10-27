@@ -19,7 +19,7 @@ jobs:
     name: Newest versions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Check for updates
         run: |
           python3 scripts/get-model.py list
@@ -42,7 +42,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       MODELS_DIR: /mnt/models
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # A screen with two buttons; the model has to say which one installs the app.
       - name: Draw a test screen
