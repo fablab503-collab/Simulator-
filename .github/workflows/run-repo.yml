@@ -78,7 +78,7 @@ jobs:
           PY
           cat plans.jsonl
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: plan
           path: plans.jsonl
@@ -116,7 +116,7 @@ jobs:
       - name: Build and test
         if: contains(matrix.item.systems, matrix.system)
         run: ./scripts/build-project.sh project "$PROJECT" result
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: result-${{ matrix.system }}-${{ strategy.job-index }}
@@ -179,7 +179,7 @@ jobs:
             adb shell monkey -p "$(cat package.txt)" -c android.intent.category.LAUNCHER 1 || echo "Could not open the app" >> result/result.txt
             sleep 20
             adb exec-out screencap -p > result/result.png
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: result-android-${{ strategy.job-index }}
@@ -225,7 +225,7 @@ jobs:
           xcrun simctl launch "$udid" "$bundle" && echo "Opened $bundle on the iPhone simulator" >> result/result.txt
           sleep 15
           xcrun simctl io "$udid" screenshot result/result.png
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: result-ios-${{ strategy.job-index }}
@@ -268,7 +268,7 @@ jobs:
           google-chrome --headless=new --no-sandbox --disable-gpu --hide-scrollbars --window-size=1280,800 \
             --virtual-time-budget=8000 --screenshot="$PWD/result/result.png" http://localhost:8000/ 2>/dev/null
           echo "Opened ${site#project/} in Chrome" >> result/result.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: result-web-${{ strategy.job-index }}
@@ -293,7 +293,7 @@ jobs:
           python3 -m pip install -q pillow 2>/dev/null || true
           python3 scripts/run-file-report.py results report
           cat report/report.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gimmich-project-report
           path: |
