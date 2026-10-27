@@ -3,6 +3,7 @@
 # FreeDOS, Haiku, FreeBSD, ChromeOS Flex), boots it in a QEMU virtual
 # machine, and saves a screenshot every 30 seconds.
 # Usage: boot-linux.sh <system> <out-dir> [minutes]
+# Set MEDIA_FILE=/path/to/disc.iso to boot your own disc instead of a download.
 # Needs: qemu-system-x86, ovmf, python3-pil, unzip (and /dev/kvm for speed).
 set -euo pipefail
 
@@ -13,13 +14,18 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="${WORK_DIR:-$PWD/work}"
 mkdir -p "$OUT_DIR" "$WORK"
 
-URL="$("$HERE/linux-iso-url.sh" "$DISTRO")"
-FILE="$(basename "${URL%/download}")"   # SourceForge links end in /download
-MEDIA="$WORK/$FILE"
-echo "Newest $DISTRO: $URL"
-echo "$DISTRO: $FILE" > "$OUT_DIR/version.txt"
-# Big downloads sometimes break halfway: retry any error and resume where it stopped.
-[[ -f "$MEDIA" ]] || curl -fL --http1.1 --retry 8 --retry-delay 10 --retry-all-errors -C - -o "$MEDIA" "$URL"
+if [[ -n "${MEDIA_FILE:-}" ]]; then
+  MEDIA="$MEDIA_FILE"
+  echo "$DISTRO: $(basename "$MEDIA")" > "$OUT_DIR/version.txt"
+else
+  URL="$("$HERE/linux-iso-url.sh" "$DISTRO")"
+  FILE="$(basename "${URL%/download}")"   # SourceForge links end in /download
+  MEDIA="$WORK/$FILE"
+  echo "Newest $DISTRO: $URL"
+  echo "$DISTRO: $FILE" > "$OUT_DIR/version.txt"
+  # Big downloads sometimes break halfway: retry any error and resume where it stopped.
+  [[ -f "$MEDIA" ]] || curl -fL --http1.1 --retry 8 --retry-delay 10 --retry-all-errors -C - -o "$MEDIA" "$URL"
+fi
 
 # Some systems come zipped: use the CD image (or ChromeOS's disk image) inside,
 # preferring a "live" CD when there is more than one.

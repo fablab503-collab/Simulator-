@@ -25,6 +25,56 @@ single download:
 - **Newest weekly bundle:** https://github.com/fablab503-collab/Simulator-/releases/download/gimmich-latest/gimmich.zip
 - **Any single run:** open the run on the Actions tab and download `gimmich`.
 
+## Gimmich control: run any file
+
+Give Gimmich one file and only the system that can open it starts:
+
+| File | Opens on |
+|---|---|
+| Android app (`.apk`) | Android emulator: installs and opens it |
+| Windows program (`.exe`, `.msi`) | Windows Server 2025 |
+| Mac app (`.dmg`, `.pkg`, zipped `.app`) | macOS 26 |
+| Bootable disc (`.iso`) | QEMU virtual PC on Linux |
+| Retro game (`.nes`, `.sfc`, `.gb`, `.gba`, `.md`) | RetroArch |
+| Web page, e-book (`.html`, `.epub`) | Chrome |
+| PDF, video, audio, picture | Linux: first page / 9 frames / sound wave / the picture |
+| Code (`.py` `.rs` `.java` `.c` `.cpp` `.go` `.js` `.sh`) | Linux: compiles and runs it |
+| Linux app (AppImage, program, `.deb`, `.rpm`) | Linux: starts it or lists what's inside |
+
+It checks what's *inside* the file first, so a wrong name doesn't fool it
+(`scripts/route-file.py`).
+
+**How:** Actions → **Run a file** → Run workflow → paste a download link. Or put
+the file in `inbox/` and push. Download `gimmich-run-report` from the run: one
+picture and one note per file.
+
+## Gimmich control: run any GitHub project
+
+Actions → **Run a GitHub project** → paste one or more repositories (e.g.
+`sharkdp/fd pallets/click`). For each one Gimmich:
+
+1. downloads it and works out **what it's written in** (Rust 97%, Shell 3%, …)
+   and **how to build it** (`scripts/detect-project.py`): Cargo, Go, npm/yarn/pnpm,
+   Python, CMake, Meson, Make, Gradle, Maven, .NET, Swift, Xcode, Flutter, Docker
+   or a plain website, including sub-projects like an Android or iPhone example app;
+2. builds and tests it on every system it fits (`scripts/build-project.sh`):
+   **Linux, Windows and Mac**; **Android** apps are installed and opened in the
+   emulator, **iPhone** apps in the simulator, and **websites** are opened in Chrome;
+3. writes one report (`gimmich-project-report`): what it built, what it made,
+   and whether its tests passed.
+
+Public repositories need nothing. For private ones, add a token with read
+access as the `GIMMICH_GITHUB_TOKEN` secret (never in a file). Gimmich runs
+the project's own build and test commands, so only give it projects you trust.
+
+## Gimmich models: AI that can use the screens
+
+`models/models.toml` lists 10 open AI models that can look at a screenshot and
+decide what to click: UI-TARS, OpenCUA, Fara, Qwen-VL, CogAgent and AutoGLM.
+The orchestrator picks one per system (`scripts/get-model.py pick android`)
+and asks it about a screen with `scripts/ask-model.sh`. See
+[models/README.md](models/README.md).
+
 ## How to use it
 
 1. Open the **Actions** tab of this repository.

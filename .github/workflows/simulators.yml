@@ -403,9 +403,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Only the photos: a re-run would otherwise also fetch the last bundle.
       - name: Download every system's photos
         uses: actions/download-artifact@v4
         with:
+          pattern: "*-screenshots"
           path: all
 
       - name: Build the Gimmich bundle

@@ -1,0 +1,129 @@
+# Gimmich models: AI models that look at a screen and decide what to click or
+# type. The orchestrator reads this list to know which models exist, what
+# each one is good at, and where to download it. scripts/get-model.py
+# downloads them and checks for updates.
+#
+#   full  = the original model on Hugging Face (big, for GPUs and training)
+#   small = a compressed GGUF copy (4-bit "Q4_K_M") that runs on a normal
+#           computer with llama.cpp; "eyes" is the part that reads pictures
+#   rev   = the exact version we tested; get-model.py check says when a newer
+#           one is out
+#   for   = which Gimmich systems it is good at (android, windows, mac,
+#           linux, games, web)
+
+[ui-tars-7b]
+name = "UI-TARS 1.5 7B"
+maker = "ByteDance"
+license = "Apache-2.0"
+good_at = "Clicking around desktops, phones and games from screenshots"
+for = ["windows", "linux", "mac", "android", "games"]
+full = "ByteDance-Seed/UI-TARS-1.5-7B"
+rev = "683d002dd99d8f95104d31e70391a39348857f4e"
+small = "mradermacher/UI-TARS-1.5-7B-GGUF"
+small_rev = "ae7049069016c5829821d9af687f144aef72068a"
+
+[opencua-7b]
+name = "OpenCUA 7B"
+maker = "XLANG Lab (open research)"
+license = "MIT"
+good_at = "Desktop computer use, with open training data"
+for = ["windows", "linux", "mac"]
+full = "xlangai/OpenCUA-7B"
+rev = "a2efb7d2b104d477a4a2666a357e79550a28aafc"
+# No compressed copy yet: full version only (needs a GPU).
+
+[opencua-32b]
+name = "OpenCUA 32B"
+maker = "XLANG Lab (open research)"
+license = "MIT"
+good_at = "The bigger, more accurate OpenCUA"
+for = ["windows", "linux", "mac"]
+full = "xlangai/OpenCUA-32B"
+rev = "7fc9dae2a94e7e25f3c23a19a18616fbe792db0f"
+# No compressed copy yet: full version only (needs a big GPU, ~67 GB).
+
+[fara-7b]
+name = "Fara 7B"
+maker = "Microsoft"
+license = "MIT"
+good_at = "Using websites and the computer, small and fast"
+for = ["web", "windows", "linux"]
+full = "microsoft/Fara-7B"
+rev = "4fca9cdeeff278777751ec558257753b89cf078b"
+small = "bartowski/microsoft_Fara-7B-GGUF"
+small_rev = "b51b2b04408fbf5da0e91ba634dfc573a38efed5"
+
+["qwen2.5-vl-3b"]
+name = "Qwen2.5-VL 3B"
+maker = "Alibaba"
+license = "Qwen research license"
+good_at = "Seeing screens; the smallest one here, a good base to fine-tune"
+for = ["android", "linux", "web"]
+full = "Qwen/Qwen2.5-VL-3B-Instruct"
+rev = "66285546d2b821cf421d4f5eb2576359d3770cd3"
+small = "ggml-org/Qwen2.5-VL-3B-Instruct-GGUF"
+small_rev = "5037fcf163dd95d1e41d1974465f0898ed108ca2"
+
+["qwen2.5-vl-7b"]
+name = "Qwen2.5-VL 7B"
+maker = "Alibaba"
+license = "Apache-2.0"
+good_at = "Seeing screens plus general skills"
+for = ["android", "windows", "linux", "mac", "web"]
+full = "Qwen/Qwen2.5-VL-7B-Instruct"
+rev = "cc594898137f460bfe9f0759e9844b3ce807cfb5"
+small = "ggml-org/Qwen2.5-VL-7B-Instruct-GGUF"
+small_rev = "508edd0afaa66bb9e9f40587acc2184f02daf1f6"
+
+[qwen3-vl-4b]
+name = "Qwen3-VL 4B"
+maker = "Alibaba"
+license = "Apache-2.0"
+good_at = "Newer Qwen: small, fast, reads screens well (Gimmich's default)"
+for = ["android", "windows", "linux", "mac", "games", "web"]
+full = "Qwen/Qwen3-VL-4B-Instruct"
+rev = "ebb281ec70b05090aa6165b016eac8ec08e71b17"
+small = "Qwen/Qwen3-VL-4B-Instruct-GGUF"
+small_rev = "1cd86afb9a95c410a6038ab3b40d8b578c892266"
+
+[qwen3-vl-8b]
+name = "Qwen3-VL 8B"
+maker = "Alibaba"
+license = "Apache-2.0"
+good_at = "Newer Qwen, bigger and smarter"
+for = ["android", "windows", "linux", "mac", "games", "web"]
+full = "Qwen/Qwen3-VL-8B-Instruct"
+rev = "0c351dd01ed87e9c1b53cbc748cba10e6187ff3b"
+small = "Qwen/Qwen3-VL-8B-Instruct-GGUF"
+small_rev = "f982a07559d4a2f6c8744d840bf6fccab30eea96"
+
+[cogagent-9b]
+name = "CogAgent 9B"
+maker = "Zhipu AI (GLM)"
+license = "GLM-4 license (read before commercial use)"
+good_at = "Desktop and phone screens"
+for = ["windows", "android"]
+full = "zai-org/cogagent-9b-20241220"
+rev = "0de2cad8d51f2621a15f9d6ba3eb2944a41f0292"
+# No compressed copy yet: full version only (needs a GPU).
+
+[autoglm-phone-9b]
+name = "AutoGLM Phone 9B"
+maker = "Zhipu AI (GLM)"
+license = "MIT"
+good_at = "Using Android phones: tapping, swiping, typing in apps"
+for = ["android"]
+full = "zai-org/AutoGLM-Phone-9B"
+rev = "66a46ea238158e5f71efc91928668e9c35b42247"
+small = "ggml-org/AutoGLM-Phone-9B-GGUF"
+small_rev = "64a2b42ed44e6b6ed44756167ffe10d8837f68dd"
+
+# Which model the orchestrator picks first for each system.
+[default]
+android = "autoglm-phone-9b"
+windows = "ui-tars-7b"
+mac = "ui-tars-7b"
+linux = "ui-tars-7b"
+games = "ui-tars-7b"
+web = "fara-7b"
+any = "qwen3-vl-4b"

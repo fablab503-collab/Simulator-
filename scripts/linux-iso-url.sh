@@ -7,7 +7,8 @@
 #   reactos freedos haiku freebsd chromeos                       (other free systems)
 set -euo pipefail
 
-get() { curl -fsSL --retry 3 "$1"; }
+# A dropped connection counts too (old-releases.ubuntu.com resets them sometimes).
+get() { curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors "$1"; }
 # Highest "NN.NN/" style folder in a directory listing.
 newest_dir() { get "$1" | grep -oE 'href="[0-9]+(\.[0-9]+)*/"' | grep -oE '[0-9]+(\.[0-9]+)*' | sort -V | tail -1; }
 

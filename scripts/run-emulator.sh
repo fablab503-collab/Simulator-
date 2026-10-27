@@ -5,6 +5,7 @@
 # software. No commercial games or BIOS files are downloaded.
 #
 # Usage: run-emulator.sh <console> <out-dir>
+# Set ROM_FILE=/path/to/game to play your own game instead of the homebrew one.
 #   nes snes gb gba genesis ps1 psp gamecube   (RetroArch + a homebrew game)
 #   ps2 ps3 ps4                                (the standalone emulator's own screen)
 # Needs: xvfb, xdotool, python3-pil, unzip, and retroarch (retro consoles)
@@ -48,14 +49,20 @@ shot() {
 if [[ -n "$core" ]]; then
   curl -fsSL --retry 3 -o "$WORK/core.zip" "$CORES/${core}_libretro.so.zip"
   unzip -o -q "$WORK/core.zip" -d "$WORK"
-  curl -fsSL --retry 3 -o "$WORK/$game" "$GAMES/$(urlencode "$dir")/$(urlencode "$game")"
+  origin="from libretro"
+  if [[ -n "${ROM_FILE:-}" ]]; then
+    game="$(basename "$ROM_FILE")"; origin="your file"
+    cp "$ROM_FILE" "$WORK/$game"
+  else
+    curl -fsSL --retry 3 -o "$WORK/$game" "$GAMES/$(urlencode "$dir")/$(urlencode "$game")"
+  fi
   content="$WORK/$game"
   if [[ "$game" == *.zip ]]; then
     unzip -o -q "$content" -d "$WORK/game"
     # The game is the biggest file inside (skips readme files).
     content="$(find "$WORK/game" -type f ! -iname '*.txt' ! -iname '*.md' ! -iname '*.pdf' ! -iname '*.htm*' -printf '%s %p\n' | sort -n | tail -1 | cut -d' ' -f2-)"
   fi
-  echo "$CONSOLE: RetroArch core $core, homebrew \"$(basename "$content")\" (from libretro)" | tee "$OUT_DIR/version.txt"
+  echo "$CONSOLE: RetroArch core $core, homebrew \"$(basename "$content")\" ($origin)" | tee "$OUT_DIR/version.txt"
 
   cat > "$WORK/retroarch.cfg" <<'CFG'
 video_driver = "gl"
