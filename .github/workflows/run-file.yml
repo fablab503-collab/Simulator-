@@ -93,7 +93,7 @@ jobs:
       FILE: input/${{ matrix.item.file }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: input
           path: input
@@ -156,7 +156,7 @@ jobs:
       KIND: ${{ matrix.item.kind }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: input
           path: input
@@ -205,7 +205,7 @@ jobs:
       KIND: ${{ matrix.item.kind }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: input
           path: input
@@ -260,7 +260,7 @@ jobs:
       EXTRA: ${{ matrix.item.extra }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: input
           path: input
@@ -311,7 +311,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: result-*
           path: results

@@ -405,7 +405,7 @@ jobs:
 
       # Only the photos: a re-run would otherwise also fetch the last bundle.
       - name: Download every system's photos
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: "*-screenshots"
           path: all
