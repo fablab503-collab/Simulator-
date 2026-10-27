@@ -38,7 +38,7 @@ jobs:
       ios: ${{ steps.plan.outputs.ios }}
       web: ${{ steps.plan.outputs.web }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Download and read each project
         env:
@@ -105,7 +105,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # Skip systems this project doesn't support (e.g. a Makefile project on Windows).
       - name: Download ${{ matrix.item.repo }}
         if: contains(matrix.item.systems, matrix.system)
@@ -137,7 +137,7 @@ jobs:
     env:
       PROJECT: ${{ toJSON(matrix.item) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -201,7 +201,7 @@ jobs:
     env:
       PROJECT: ${{ toJSON(matrix.item) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Download ${{ matrix.item.repo }}
         run: |
           url="https://github.com/${{ matrix.item.repo }}"
@@ -247,7 +247,7 @@ jobs:
     env:
       PROJECT: ${{ toJSON(matrix.item) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Download ${{ matrix.item.repo }}
         run: |
           url="https://github.com/${{ matrix.item.repo }}"
@@ -283,7 +283,7 @@ jobs:
     if: ${{ !cancelled() && needs.understand.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           pattern: result-*

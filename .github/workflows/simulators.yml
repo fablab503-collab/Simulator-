@@ -27,7 +27,7 @@ jobs:
     env:
       IOS_MAJOR: ${{ matrix.ios }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Download older iOS if missing
         if: matrix.ios != ''
@@ -81,7 +81,7 @@ jobs:
           # Intel chip, like Macs from before 2020
           - { name: "Sequoia (Intel)", runner: macos-15-intel, file: sequoia-intel }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Take desktop screenshot
         run: ./scripts/screenshot-mac.sh screenshots mac-${{ matrix.file }}
@@ -118,7 +118,7 @@ jobs:
           - device: foldable
             profile: auto-fold   # picked below from the folding phones the SDK knows
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Lets the Android emulator use the Linux machine's hardware
       # acceleration (KVM), which makes it fast enough to boot.
@@ -196,7 +196,7 @@ jobs:
       matrix:
         api: [21, 23, 24, 26, 28, 29, 30, 31, 33, 34, 35]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Enable KVM
         run: |
@@ -245,7 +245,7 @@ jobs:
           - { name: "Server 2025", runner: windows-2025, file: server2025 }
           - { name: "Server 2022", runner: windows-2022, file: server2022 }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Take desktop screenshot
         shell: pwsh
@@ -303,7 +303,7 @@ jobs:
           - freebsd
           - chromeos
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Enable KVM
         run: |
@@ -350,7 +350,7 @@ jobs:
       matrix:
         console: [nes, snes, gb, gba, genesis, ps1, psp, gamecube, ps2, ps3, ps4]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Install only what this console needs (no ImageMagick: it pulls in big
       # font packages that stalled on a slow mirror). A stalled download gives
@@ -401,7 +401,7 @@ jobs:
     permissions:
       contents: write   # to publish the weekly "gimmich-latest" release
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Only the photos: a re-run would otherwise also fetch the last bundle.
       - name: Download every system's photos
