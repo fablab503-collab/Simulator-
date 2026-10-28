@@ -8,6 +8,9 @@ on:
     - cron: "17 6 * * 1"   # every Monday at 06:17 UTC, to pick up new versions
   workflow_dispatch:       # adds a "Run workflow" button on the Actions tab
 
+permissions:
+  contents: read
+
 jobs:
   apple:
     name: iPhone, iPad and Apple Watch (${{ matrix.name }})
