@@ -75,6 +75,14 @@ The orchestrator picks one per system (`scripts/get-model.py pick android`)
 and asks it about a screen with `scripts/ask-model.sh`. See
 [models/README.md](models/README.md).
 
+## Gimmich gym: AIs that use the screens
+
+The AI models can now use the systems by themselves: look at the screen,
+click, type and press keys, one step at a time, on Linux screens and Android
+phones. Practice tasks check automatically whether they got it right, and
+every run is saved as training data. See [scripts/gym/README.md](scripts/gym/README.md);
+on GitHub: **Actions → AI gym**.
+
 ## How to use it
 
 1. Open the **Actions** tab of this repository.

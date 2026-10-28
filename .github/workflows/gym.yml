@@ -1,0 +1,137 @@
+name: AI gym
+
+# Gimmich gym: an AI uses the screens by itself (scripts/gym). It looks at a
+# screenshot, picks one action, Gimmich does it, and the practice task checks
+# whether it worked. Every run is saved as training data (screenshots +
+# actions) in the gym-* downloads.
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "AI to train/test (a name from models/models.toml)"
+        default: qwen3-vl-4b
+      ask:
+        description: "Optional: any job for the AI on the Linux screen, e.g. 'Open the File menu' (empty = the practice tasks)"
+        required: false
+  pull_request:
+    paths:
+      - .github/workflows/gym.yml
+      - scripts/gym/**
+      - scripts/get-llama.sh
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  MODELS_DIR: /mnt/models
+
+jobs:
+  desktop:
+    name: Linux screen · ${{ matrix.model }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        model: ${{ fromJSON(github.event_name == 'pull_request' && '["qwen3-vl-4b","ui-tars-7b"]' || format('["{0}"]', inputs.model)) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the screen tools
+        run: |
+          sudo apt-get update -q
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends xvfb xdotool python3-pil
+          sudo mkdir -p /mnt/models && sudo chown "$USER" /mnt/models
+      - name: Get the AI and llama.cpp
+        run: |
+          python3 scripts/get-model.py get ${{ matrix.model }} --dest "$MODELS_DIR"
+          ./scripts/get-llama.sh
+      - name: Train in the gym
+        env:
+          ASK: ${{ inputs.ask }}
+        run: |
+          Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &
+          export DISPLAY=:99
+          sleep 2
+          if [ -n "$ASK" ]; then
+            python3 scripts/gym/agent.py --screen x11 --ask "$ASK" --steps 10 --model ${{ matrix.model }} --out gym-runs
+          else
+            python3 scripts/gym/agent.py --all --screen x11 --model ${{ matrix.model }} --out gym-runs
+          fi
+          echo "### ${{ matrix.model }} on the Linux screen: $(cat gym-runs/score.txt)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gym-desktop-${{ matrix.model }}
+          path: gym-runs/
+      # The gym itself is broken if even the default AI can't do one task.
+      - name: Check the gym works
+        if: matrix.model == 'qwen3-vl-4b' && inputs.ask == ''
+        run: |
+          score="$(sed -E 's/.*: ([0-9]+) of.*/\1/' gym-runs/score.txt)"
+          [ "$score" -ge 1 ] || { echo "::error::The AI did not finish any practice task"; exit 1; }
+
+  android:
+    name: Android phone · ${{ github.event_name == 'pull_request' && 'autoglm-phone-9b' || inputs.model }}
+    if: inputs.ask == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MODEL: ${{ github.event_name == 'pull_request' && 'autoglm-phone-9b' || inputs.model }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Get the AI and llama.cpp
+        run: |
+          sudo mkdir -p /mnt/models && sudo chown "$USER" /mnt/models
+          python3 -m pip install -q pillow 2>/dev/null || true
+          python3 scripts/get-model.py get "$MODEL" --dest "$MODELS_DIR"
+          ./scripts/get-llama.sh
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # Each line of this script runs on its own, so no multi-line commands.
+      - name: Train on the phone
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          script: |
+            sleep 60
+            adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
+            python3 scripts/gym/agent.py --all --screen android --model "$MODEL" --out gym-runs
+            echo "### $MODEL on the Android phone: $(cat gym-runs/score.txt)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gym-android-${{ env.MODEL }}
+          path: gym-runs/
+
+  report:
+    name: Report
+    needs: [desktop, android]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gym-*
+          path: runs
+      # One row per task and AI: its last screen and how it went.
+      - name: Make the report
+        run: |
+          python3 -m pip install -q pillow 2>/dev/null || true
+          mkdir -p flat
+          for d in runs/*/*/; do
+            [ -f "$d/result.txt" ] || continue
+            run="$(basename "$(dirname "$d")")"; task="$(basename "$d")"
+            mkdir -p "flat/${run#gym-}-$task" && cp "$d/result.txt" "$d/result.png" "flat/${run#gym-}-$task/" 2>/dev/null || true
+          done
+          python3 scripts/run-file-report.py flat report
+          cat report/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gym-report
+          path: report/
