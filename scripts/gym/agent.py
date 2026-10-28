@@ -101,7 +101,8 @@ class ModelServer:
         body = {"messages": [{"role": "user", "content": [
                     {"type": "image_url", "image_url": {"url": "data:image/png;base64," + base64.b64encode(png).decode()}},
                     {"type": "text", "text": prompt}]}],
-                "temperature": 0, "max_tokens": 120}
+                # Some AIs (AutoGLM) think aloud before the action, so leave room.
+                "temperature": 0, "max_tokens": 512}
         req = urllib.request.Request(self.url + "/v1/chat/completions", json.dumps(body).encode(),
                                      {"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=900) as r:
@@ -126,6 +127,11 @@ def parse(answer):
             name = str(a.get("action") or a.get("type")).lower()
             a["action"] = {"tap": "click", "left_click": "click", "press": "key", "hotkey": "key",
                            "finished": "done", "finish": "done", "input": "type", "write": "type"}.get(name, name)
+            # Positions written as one text, e.g. "x": "434,499" (UI-TARS does this).
+            for key in ("x", "coordinate", "point", "position"):
+                both = re.findall(r"\d+(?:\.\d+)?", str(a.get(key, ""))) if isinstance(a.get(key), str) else []
+                if len(both) >= 2:
+                    a["x"], a["y"] = float(both[0]), float(both[1])
             if a["action"] == "click" and "x" not in a:
                 pos = a.get("coordinate") or a.get("point") or a.get("position")
                 if isinstance(pos, (list, tuple)) and len(pos) >= 2:
