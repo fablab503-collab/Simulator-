@@ -48,7 +48,9 @@ Reply with exactly ONE action as JSON on one line, nothing else. Choose from:
 {{"action": "type", "text": "..."}}      type text where the cursor is
 {{"action": "key", "key": "Enter"}}      Enter, Escape, Tab, Backspace, Up, Down, Home, Back
 {{"action": "scroll", "direction": "down"}}
-{{"action": "done"}}                     when the task is finished"""
+{{"action": "open_app", "app": "Settings"}}   phones only: start an app by its name
+{{"action": "done"}}                     when the task is finished
+Tips: click a text box before typing into it. When the task says to press a key, use the key action."""
 
 
 # --- The AI ---------------------------------------------------------------
@@ -126,7 +128,8 @@ def parse(answer):
         if isinstance(a, dict) and ("action" in a or "type" in a):
             name = str(a.get("action") or a.get("type")).lower()
             a["action"] = {"tap": "click", "left_click": "click", "press": "key", "hotkey": "key",
-                           "finished": "done", "finish": "done", "input": "type", "write": "type"}.get(name, name)
+                           "finished": "done", "finish": "done", "input": "type", "write": "type",
+                           "launch": "open_app", "open": "open_app", "app": "open_app"}.get(name, name)
             # Positions written as one text, e.g. "x": "434,499" (UI-TARS does this).
             for key in ("x", "coordinate", "point", "position"):
                 both = re.findall(r"\d+(?:\.\d+)?", str(a.get(key, ""))) if isinstance(a.get(key), str) else []
@@ -147,6 +150,9 @@ def parse(answer):
             return {"action": "click", "x": float(pos.group(1)), "y": float(pos.group(2))}
         if kind == "type" and text:
             return {"action": "type", "text": text.group(1)}
+        app = re.search(r'app="([^"]*)"', rest)
+        if kind in ("launch", "app", "open", "open_app") and app:
+            return {"action": "open_app", "app": app.group(1)}
         if kind in ("back", "home", "enter"):
             return {"action": "key", "key": kind.capitalize()}
         if kind == "swipe":
@@ -283,6 +289,10 @@ def run_task(name, task, screen, ai, out, room=None):
                 screen.key(str(action.get("key", "Enter")))
             elif kind == "scroll":
                 screen.scroll(str(action.get("direction", "down")))
+            elif kind == "open_app":
+                if not hasattr(screen, "open_app"):
+                    raise ValueError("this screen can't open apps by name")
+                screen.open_app(str(action.get("app", "")))
             elif kind == "wait":
                 time.sleep(3)
         except Exception as e:  # a bad action (e.g. no x) counts as a wasted step

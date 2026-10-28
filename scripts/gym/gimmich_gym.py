@@ -8,6 +8,7 @@ Every screen has the same five commands:
   key(name)                 press a key: Enter, Escape, Tab, Backspace, Up,
                             Down, Left, Right, Home, Back (Android), Space
   scroll(direction)         scroll "up" or "down"
+  open_app(name)            phones only: start an app by name ("Settings")
 
 Screens so far:
   x11       a Linux screen (the real one or Xvfb): desktops, browsers, apps and
@@ -82,6 +83,27 @@ class Android:
 
     def key(self, name):
         run(self.adb + ["shell", "input", "keyevent", self.KEYS.get(name, name)])
+
+    # App names (as AIs say them, in English and Chinese) -> packages.
+    APPS = {"settings": "com.android.settings", "设置": "com.android.settings", "系统设置": "com.android.settings",
+            "chrome": "com.android.chrome", "browser": "com.android.chrome", "浏览器": "com.android.chrome",
+            "camera": "com.android.camera2", "相机": "com.android.camera2", "contacts": "com.android.contacts",
+            "phone": "com.android.dialer", "电话": "com.android.dialer", "messages": "com.google.android.apps.messaging",
+            "clock": "com.google.android.deskclock", "calendar": "com.google.android.calendar",
+            "files": "com.google.android.documentsui", "photos": "com.google.android.apps.photos",
+            "maps": "com.google.android.apps.maps", "youtube": "com.google.android.youtube", "gmail": "com.google.android.gm"}
+
+    def open_app(self, name):
+        """Starts an app by its name (or package)."""
+        key = name.strip().lower()
+        package = self.APPS.get(key) or (key if "." in key else None)
+        if not package:  # look for an installed package with that word in it
+            out = subprocess.run(self.adb + ["shell", "pm", "list", "packages"], capture_output=True, text=True).stdout
+            package = next((l.split(":", 1)[1].strip() for l in out.splitlines() if key.replace(" ", "") in l.lower()), None)
+        if not package:
+            raise ValueError("no app called %r" % name)
+        run(self.adb + ["shell", "monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1"],
+            stdout=subprocess.DEVNULL)
 
     def scroll(self, direction):
         # Swipe in the middle of a phone-sized screen.
