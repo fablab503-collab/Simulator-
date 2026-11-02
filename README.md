@@ -25,6 +25,33 @@ single download:
 - **Newest weekly bundle:** https://github.com/fablab503-collab/Simulator-/releases/download/gimmich-latest/gimmich.zip
 - **Any single run:** open the run on the Actions tab and download `gimmich`.
 
+## Gimmich Viewer: see it all on your own computer
+
+An app that shows every system's picture in one window: grouped (Apple,
+Macs, Android, Windows, Linux, other systems, game consoles), each labeled
+with its exact version, with search and a big view (← → to flip through).
+
+**On a Mac:** download this repository, then double-click
+**`Gimmich Viewer.command`** in Finder. Anywhere else:
+
+```
+python3 scripts/gimmich-viewer.py
+```
+
+It opens in your browser. Then:
+
+- **Get the newest from GitHub** downloads the weekly bundle (about 55 MB).
+- **Take pictures on this Mac** (Macs only) photographs your own Mac's newest
+  iPhone, iPad and Apple Watch simulators (needs Xcode) and your screen, and
+  shows them under “This Mac”. Your wallpaper and windows are left alone.
+- To look at a run you downloaded from the Actions tab, unpack it and add
+  its folder: `python3 scripts/gimmich-viewer.py ~/Downloads/gimmich`.
+
+Everything is kept in `~/Gimmich`. Only your computer can open the page. It
+needs only Python 3.9 or newer, which a Mac has once Xcode is installed. The
+first screen picture asks for permission: allow Terminal in System Settings →
+Privacy & Security → Screen Recording.
+
 ## Gimmich control: run any file
 
 Give Gimmich one file and only the system that can open it starts:
@@ -98,6 +125,11 @@ and asks it about a screen with `scripts/ask-model.sh`. See
   Apple Watch simulators, screenshots them, and lists every installed runtime.
 - `scripts/screenshot-windows.ps1`: screenshots the Windows desktop.
 - `scripts/screenshot-mac.sh`: screenshots a Mac desktop and records its macOS version and chip.
+  It changes the desktop picture and hides open windows first, so it's meant
+  for GitHub's Macs; on your own Mac, use the Gimmich Viewer instead.
+- `scripts/gimmich-viewer.py` (and `Gimmich Viewer.command`): the viewer app above.
+- `scripts/gimmich_labels.py`: how every picture is labeled, shared by the
+  bundle (`scripts/make-gimmich.py`) and the viewer.
 - `scripts/linux-iso-url.sh`: finds the newest download for each Linux.
 - `scripts/boot-linux.sh`: boots that Linux in a virtual machine and screenshots it every 30 seconds.
 
