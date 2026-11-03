@@ -33,7 +33,7 @@ jobs:
       matrix:
         model: ${{ fromJSON(github.event_name == 'pull_request' && '["qwen3-vl-4b","ui-tars-7b"]' || format('["{0}"]', inputs.model)) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Install the screen tools
         run: |
           sudo apt-get update -q
@@ -76,7 +76,7 @@ jobs:
     env:
       MODEL: ${{ github.event_name == 'pull_request' && 'autoglm-phone-9b' || inputs.model }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Get the AI and llama.cpp
         run: |
           sudo mkdir -p /mnt/models && sudo chown "$USER" /mnt/models
@@ -114,7 +114,7 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           pattern: gym-*
