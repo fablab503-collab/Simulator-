@@ -56,7 +56,7 @@ jobs:
             python3 scripts/gym/agent.py --all --screen x11 --model ${{ matrix.model }} --out gym-runs
           fi
           echo "### ${{ matrix.model }} on the Linux screen: $(cat gym-runs/score.txt)" >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: gym-desktop-${{ matrix.model }}
@@ -102,7 +102,7 @@ jobs:
             adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS
             python3 scripts/gym/agent.py --all --screen android --model "$MODEL" --out gym-runs
             echo "### $MODEL on the Android phone: $(cat gym-runs/score.txt)" >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: gym-android-${{ env.MODEL }}
@@ -131,7 +131,7 @@ jobs:
           done
           python3 scripts/run-file-report.py flat report
           cat report/report.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gym-report
           path: report/

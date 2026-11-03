@@ -74,7 +74,7 @@ jobs:
           for l in open("route.jsonl"):
               r = json.loads(l); print("- **%s**: %s → **%s**" % (r["file"], r["detail"], r["system"]))' >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: input
           path: input/
@@ -135,7 +135,7 @@ jobs:
             sleep 20
             adb exec-out screencap -p > result/result.png
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: result-android-${{ strategy.job-index }}
@@ -184,7 +184,7 @@ jobs:
           Move-Item result/windows-desktop.png result/result.png
           (Get-ComputerInfo).OsName | Out-File -Append result/result.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: result-windows-${{ strategy.job-index }}
@@ -238,7 +238,7 @@ jobs:
           mv result/mac.png result/result.png
           sed -n 1p result/mac-version.txt >> result/result.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: result-mac-${{ strategy.job-index }}
@@ -298,7 +298,7 @@ jobs:
           sudo mkdir -p /mnt/work && sudo chown "$USER" /mnt/work
           WORK_DIR=/mnt/work ./scripts/run-file-linux.sh "$FILE" "$KIND" "$EXTRA" result
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: result-linux-${{ strategy.job-index }}
@@ -322,7 +322,7 @@ jobs:
           python3 scripts/run-file-report.py results report
           cat report/report.md >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gimmich-run-report
           path: |
