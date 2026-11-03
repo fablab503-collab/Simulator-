@@ -1,0 +1,46 @@
+# Gimmich gym practice tasks. Each one says which screen it runs on, what to
+# open first, what to ask the AI, and how to check (automatically) that it
+# worked. agent.py runs the check after every step and stops when it passes.
+#
+#   screen  x11 or android
+#   open    x11: a page of the practice room (practice-app.py), shown in Chrome
+#           android: nothing (the phone's home screen) or an app package
+#   task    what the AI is asked, in plain words
+#   check   x11: a JSON event the page must report, as key = value pairs
+#           android: a package that must be in front when the task is done
+#   steps   how many actions the AI may take
+
+[click-install]
+screen = "x11"
+open = "install"
+task = "Click the Install button."
+check = { page = "install", clicked = "Install" }
+steps = 3
+
+[type-name]
+screen = "x11"
+open = "type"
+task = "Click the text box, type the name Gimmich, then press Enter."
+check = { page = "type", typed = "Gimmich" }
+steps = 5
+
+[menu-settings]
+screen = "x11"
+open = "menu"
+task = "Open the File menu, then choose Settings."
+check = { page = "menu", chose = "Settings" }
+steps = 5
+
+[fill-form]
+screen = "x11"
+open = "form"
+task = "Type Paris in the City box, tick the I agree box, then press Save."
+check = { page = "form", city = "Paris", agree = "true" }
+steps = 8
+
+[android-open-settings]
+screen = "android"
+open = ""
+task = "Open the Settings app."
+check = "com.android.settings"
+steps = 6
