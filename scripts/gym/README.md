@@ -27,3 +27,7 @@ python3 scripts/gym/gimmich_gym.py android screenshot phone.png    # by hand
 type a command that deletes, formats, shuts down or uses sudo.
 
 On GitHub: **Actions → AI gym → Run workflow** (pick the AI, or give it any job).
+
+Auto loop: the gym also runs by itself every night at 02:17 UTC with the three
+default AIs (Qwen3-VL 4B and UI-TARS 7B on Linux, AutoGLM Phone 9B on Android).
+Each night's screenshots and moves are kept for 90 days in the run's downloads.

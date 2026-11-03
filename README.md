@@ -83,7 +83,8 @@ The AI models can now use the systems by themselves: look at the screen,
 click, type and press keys, one step at a time, on Linux screens and Android
 phones. Practice tasks check automatically whether they got it right, and
 every run is saved as training data. See [scripts/gym/README.md](scripts/gym/README.md);
-on GitHub: **Actions → AI gym**.
+on GitHub: **Actions → AI gym**. It also runs by itself every night (02:17 UTC),
+so new training data keeps piling up.
 
 ## How to use it
 

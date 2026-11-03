@@ -4,7 +4,12 @@ name: AI gym
 # screenshot, picks one action, Gimmich does it, and the practice task checks
 # whether it worked. Every run is saved as training data (screenshots +
 # actions) in the gym-* downloads.
+#
+# Auto loop: it also runs by itself every night, so new practice data keeps
+# piling up (each night's downloads stay for 90 days).
 on:
+  schedule:
+    - cron: "17 2 * * *"
   workflow_dispatch:
     inputs:
       model:
@@ -31,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        model: ${{ fromJSON(github.event_name == 'pull_request' && '["qwen3-vl-4b","ui-tars-7b"]' || format('["{0}"]', inputs.model)) }}
+        model: ${{ fromJSON(github.event_name != 'workflow_dispatch' && '["qwen3-vl-4b","ui-tars-7b"]' || format('["{0}"]', inputs.model)) }}
     steps:
       - uses: actions/checkout@v5
       - name: Install the screen tools
@@ -69,12 +74,12 @@ jobs:
           [ "$score" -ge 1 ] || { echo "::error::The AI did not finish any practice task"; exit 1; }
 
   android:
-    name: Android phone · ${{ github.event_name == 'pull_request' && 'autoglm-phone-9b' || inputs.model }}
+    name: Android phone · ${{ github.event_name != 'workflow_dispatch' && 'autoglm-phone-9b' || inputs.model }}
     if: inputs.ask == ''
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      MODEL: ${{ github.event_name == 'pull_request' && 'autoglm-phone-9b' || inputs.model }}
+      MODEL: ${{ github.event_name != 'workflow_dispatch' && 'autoglm-phone-9b' || inputs.model }}
     steps:
       - uses: actions/checkout@v5
       - name: Get the AI and llama.cpp
