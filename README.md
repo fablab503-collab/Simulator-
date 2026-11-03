@@ -64,8 +64,10 @@ Actions → **Run a GitHub project** → paste one or more repositories (e.g.
    and whether its tests passed.
 
 Public repositories need nothing. For private ones, add a token with read
-access as the `GIMMICH_GITHUB_TOKEN` secret (never in a file). Gimmich runs
-the project's own build and test commands, so only give it projects you trust.
+access as the `GIMMICH_GITHUB_TOKEN` secret (never in a file). It is only used
+to download the project (`scripts/get-project.sh`): the project's build and
+tests never see it. Gimmich runs the project's own build and test commands,
+so only give it projects you trust.
 
 ## Gimmich models: AI that can use the screens
 

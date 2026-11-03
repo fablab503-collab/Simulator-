@@ -23,6 +23,11 @@ on:
       - scripts/route-file.py
       - scripts/run-file-*
 
+# GitHub's own token can only read: the files given to Gimmich run on these
+# machines, so they must not be able to change this repository.
+permissions:
+  contents: read
+
 jobs:
   route:
     name: Find the right system
@@ -42,6 +47,7 @@ jobs:
           URL: ${{ inputs.url }}
           NAME: ${{ inputs.name }}
           GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
         run: |
           mkdir input
           if [ "${{ github.event_name }}" = pull_request ]; then
@@ -56,9 +62,17 @@ jobs:
             [ -n "$NAME" ] || NAME="$(python3 -c 'import os, sys, urllib.parse as u; print(os.path.basename(u.unquote(u.urlparse(sys.argv[1]).path)) or "file")' "$URL")"
             curl -fL --retry 5 --retry-all-errors -o "input/$(basename "$NAME")" "$URL"
           elif [ "${{ github.event_name }}" = push ]; then
-            # Only the files this push added or changed.
-            git diff --name-only --diff-filter=AM HEAD~1 HEAD -- inbox | grep -v '^inbox/README.md$' |
-              while IFS= read -r f; do cp "$f" input/; done
+            # Only the files this push added or changed. A push can hold several
+            # commits, so compare with where main was before it ($BEFORE); if that
+            # can't be fetched (a new or force-pushed branch), use the last commit.
+            base=HEAD~1
+            if [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] &&
+               git fetch -q --depth=1 origin "$BEFORE"; then
+              base="$BEFORE"
+            fi
+            # quotePath=false: names like "café.nes" come out as they are.
+            git -c core.quotePath=false diff --name-only --diff-filter=AM "$base" HEAD -- inbox |
+              grep -v '^inbox/README.md$' | while IFS= read -r f; do cp "$f" input/; done
           else
             find inbox -type f ! -name README.md -exec cp {} input/ \;
           fi
@@ -91,8 +105,12 @@ jobs:
         item: ${{ fromJSON(needs.route.outputs.android) }}
     env:
       FILE: input/${{ matrix.item.file }}
+      FILE_NAME: ${{ matrix.item.file }}
+      DETAIL: ${{ matrix.item.detail }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: input
@@ -112,7 +130,7 @@ jobs:
             | grep -oE 'android-[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1)"
           echo "level=$level" >> "$GITHUB_OUTPUT"
           mkdir -p result
-          printf 'File: %s\nKind: %s\n' "${{ matrix.item.file }}" "${{ matrix.item.detail }}" > result/result.txt
+          printf 'File: %s\nKind: %s\n' "$FILE_NAME" "$DETAIL" > result/result.txt
 
       # Each line of this script runs on its own, so no multi-line commands.
       - name: Install the app and open it
@@ -153,9 +171,13 @@ jobs:
         item: ${{ fromJSON(needs.route.outputs.windows) }}
     env:
       FILE: input/${{ matrix.item.file }}
+      FILE_NAME: ${{ matrix.item.file }}
+      DETAIL: ${{ matrix.item.detail }}
       KIND: ${{ matrix.item.kind }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: input
@@ -165,7 +187,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force result | Out-Null
-          "File: ${{ matrix.item.file }}", "Kind: ${{ matrix.item.detail }}" | Out-File result/result.txt
+          "File: $env:FILE_NAME", "Kind: $env:DETAIL" | Out-File result/result.txt
           $file = Resolve-Path $env:FILE
           if ($env:KIND -eq "windows-installer") {
             # Installs quietly, then shows the desktop.
@@ -202,9 +224,13 @@ jobs:
         item: ${{ fromJSON(needs.route.outputs.mac) }}
     env:
       FILE: input/${{ matrix.item.file }}
+      FILE_NAME: ${{ matrix.item.file }}
+      DETAIL: ${{ matrix.item.detail }}
       KIND: ${{ matrix.item.kind }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: input
@@ -213,7 +239,7 @@ jobs:
       - name: Install the app and open it
         run: |
           mkdir -p result work
-          printf 'File: %s\nKind: %s\n' "${{ matrix.item.file }}" "${{ matrix.item.detail }}" > result/result.txt
+          printf 'File: %s\nKind: %s\n' "$FILE_NAME" "$DETAIL" > result/result.txt
           case "$KIND" in
             mac-installer)
               sudo installer -pkg "$FILE" -target / 2>&1 | tee result/install.txt
@@ -260,6 +286,8 @@ jobs:
       EXTRA: ${{ matrix.item.extra }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: input
@@ -311,6 +339,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           pattern: result-*
